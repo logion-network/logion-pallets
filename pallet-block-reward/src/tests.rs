@@ -1,5 +1,6 @@
-use super::*;
+use crate::*;
 use mock::*;
+use frame_support::assert_err;
 
 #[test]
 pub fn inflation_as_expected() {
@@ -31,4 +32,20 @@ pub fn reward_distributed_as_expected() {
 
 fn get_free_balance(account_id: AccountId) -> Balance {
     <Test as Config>::Currency::free_balance(account_id)
+}
+
+#[test]
+pub fn balances_transfer_allow_death_underflow() {
+    let account_id = 5;
+    new_test_ext().execute_with(|| {
+        assert_err!(Balances::transfer_allow_death(RuntimeOrigin::signed(account_id), RESERVE_ACCOUNT, 10), <pallet_balances::Error<Test>>::InsufficientBalance);
+    })
+}
+
+#[test]
+pub fn balances_transfer_keep_alive_underflow() {
+    let account_id = 5;
+    new_test_ext().execute_with(|| {
+        assert_err!(Balances::transfer_keep_alive(RuntimeOrigin::signed(account_id), RESERVE_ACCOUNT, 10), <pallet_balances::Error<Test>>::InsufficientBalance);
+    })
 }
