@@ -22,7 +22,7 @@ use frame_support::{
     codec::{Decode, Encode},
     dispatch::Vec,
 };
-use frame_support::traits::Currency;
+use frame_support::traits::{Currency, ReservableCurrency};
 use scale_info::TypeInfo;
 use logion_shared::LegalOfficerCaseSummary;
 use crate::Requester::Account;
@@ -123,7 +123,7 @@ impl<AccountId, EthereumAddress> Default for SupportedAccountId<AccountId, Ether
 pub type CollectionSize = u32;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
-pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId> {
+pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance> {
     owner: AccountId,
     requester: Requester<AccountId, LocId, EthereumAddress>,
     metadata: Vec<MetadataItem<AccountId, EthereumAddress, Hash>>,
@@ -138,6 +138,7 @@ pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress
     collection_can_upload: bool,
     seal: Option<Hash>,
     sponsorship_id: Option<SponsorshipId>,
+    value_fee: Balance,
 }
 
 pub type LegalOfficerCaseOf<T> = LegalOfficerCase<
@@ -147,6 +148,7 @@ pub type LegalOfficerCaseOf<T> = LegalOfficerCase<
     <T as frame_system::Config>::BlockNumber,
     <T as pallet::Config>::EthereumAddress,
     <T as pallet::Config>::SponsorshipId,
+    BalanceOf<T>,
 >;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
@@ -315,7 +317,7 @@ pub mod pallet {
         type MaxTokensRecordFiles: Get<u32>;
 
         /// The currency trait.
-        type Currency: Currency<Self::AccountId>;
+        type Currency: ReservableCurrency<Self::AccountId>;
 
         /// The variable part of the Fee to pay to store a file (per byte)
         type FileStorageByteFee: Get<BalanceOf<Self>>;
@@ -326,7 +328,7 @@ pub mod pallet {
         /// Used to payout file storage fees
         type RewardDistributor: RewardDistributor<NegativeImbalanceOf<Self>, BalanceOf<Self>>;
 
-        /// Used to payout rewards
+        /// Used to compute storage fees rewards
         type FileStorageFeeDistributionKey: Get<DistributionKey>;
 
         /// Ethereum Address type
@@ -344,11 +346,14 @@ pub mod pallet {
         /// The certificate fee per issued token
         type CertificateFee: Get<BalanceOf<Self>>;
 
-        /// Used to payout rewards
+        /// Used to compute certificate fees rewards
         type CertificateFeeDistributionKey: Get<DistributionKey>;
 
         /// The collection item's token issuance type
         type TokenIssuance: Balance + Into<BalanceOf<Self>>;
+
+        /// Used to compute value fees rewards
+        type ValueFeeDistributionKey: Get<DistributionKey>;
     }
 
     #[pallet::pallet]
@@ -459,6 +464,8 @@ pub mod pallet {
         LegalFeeWithdrawn(T::AccountId, Beneficiary<T::AccountId>, BalanceOf<T>),
         /// Issued when Certificate Fee is withdrawn. [payerAccountId, fee]
         CertificateFeeWithdrawn(T::AccountId, BalanceOf<T>),
+        /// Issued when Value Fee is withdrawn. [payerAccountId, storageFee]
+        ValueFeeWithdrawn(T::AccountId, BalanceOf<T>),
     }
 
     #[pallet::error]
@@ -562,43 +569,16 @@ pub mod pallet {
 
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+
         fn integrity_test() {
             assert!(T::FileStorageFeeDistributionKey::get().is_valid());
+            assert!(T::CertificateFeeDistributionKey::get().is_valid());
+            assert!(T::ValueFeeDistributionKey::get().is_valid());
         }
 
         #[cfg(feature = "try-runtime")]
         fn post_upgrade(_state: Vec<u8>) -> Result<(), sp_runtime::DispatchError> {
-            CollectionItemsMap::<T>::iter().for_each(|entry| {
-                let loc_id = entry.0;
-                let item_id = entry.1;
-                let item = entry.2;
-                log::info!("LOC {:?} item {:?} description {:?}", loc_id, item_id, item.description);
-
-                item.files.iter().for_each(|file| {
-                    log::info!("LOC {:?} item {:?} file {:?} name {:?} content type {:?}", loc_id, item_id, file.hash, file.name, file.content_type);
-                });
-
-                if item.token.is_some() {
-                    let token = item.token.unwrap();
-                    log::info!("LOC {:?} item {:?} token id {:?} type {:?}", loc_id, item_id, token.token_id, token.token_type);
-                }
-
-                item.terms_and_conditions.iter().for_each(|terms| {
-                    log::info!("LOC {:?} item {:?} terms type {:?} details type {:?}", loc_id, item_id, terms.tc_type, terms.details);
-                });
-            });
-
-            TokensRecordsMap::<T>::iter().for_each(|entry| {
-                let loc_id = entry.0;
-                let record_id = entry.1;
-                let record = entry.2;
-                log::info!("LOC {:?} record {:?} description {:?}", loc_id, record_id, record.description);
-
-                record.files.iter().for_each(|file| {
-                    log::info!("LOC {:?} record {:?} file {:?} name {:?} content type {:?}", loc_id, record_id, file.hash, file.name, file.content_type);
-                });
-            });
-
+            assert_eq!(PalletStorageVersion::<T>::get(), StorageVersion::default());
             Ok(())
         }
     }
@@ -622,11 +602,12 @@ pub mod pallet {
         V15AddTokenIssuance,
         V16MoveTokenIssuance,
         V17HashItemRecordPublicData,
+        V18AddValueFee,
     }
 
     impl Default for StorageVersion {
         fn default() -> StorageVersion {
-            return StorageVersion::V17HashItemRecordPublicData;
+            return StorageVersion::V18AddValueFee;
         }
     }
 
@@ -757,6 +738,7 @@ pub mod pallet {
             collection_last_block_submission: Option<T::BlockNumber>,
             collection_max_size: Option<u32>,
             collection_can_upload: bool,
+            value_fee: BalanceOf<T>,
         ) -> DispatchResultWithPostInfo {
             let requester_account_id = ensure_signed(origin)?;
 
@@ -776,9 +758,14 @@ pub mod pallet {
                     collection_last_block_submission,
                     collection_max_size,
                     collection_can_upload,
+                    value_fee,
                 );
 
                 Self::apply_legal_fee(&loc)?;
+                if value_fee > 0_u32.into() {
+                    ensure!(T::Currency::can_reserve(&requester_account_id, value_fee), Error::<T>::InsufficientFunds);
+                    T::Currency::reserve(&requester_account_id, value_fee)?
+                }
                 <LocMap<T>>::insert(loc_id, loc);
                 Self::link_with_account(&requester_account_id, &loc_id);
 
@@ -1374,23 +1361,33 @@ pub mod pallet {
                         }
                     }
                 }
-            }
 
-            let loc_void_info = LocVoidInfo {
-                replacer:replacer_loc_id
-            };
-            <LocMap<T>>::mutate(loc_id, |loc| {
-                let mutable_loc = loc.as_mut().unwrap();
-                mutable_loc.void_info = Some(loc_void_info);
-            });
-            if replacer_loc_id.is_some() {
-                <LocMap<T>>::mutate(replacer_loc_id.unwrap(), |replacer_loc| {
-                    let mutable_replacer_loc = replacer_loc.as_mut().unwrap();
-                    mutable_replacer_loc.replacer_of = Some(loc_id);
+                let loc_void_info = LocVoidInfo {
+                    replacer:replacer_loc_id
+                };
+                <LocMap<T>>::mutate(loc_id, |loc| {
+                    let mutable_loc = loc.as_mut().unwrap();
+                    mutable_loc.void_info = Some(loc_void_info);
                 });
+                if replacer_loc_id.is_some() {
+                    <LocMap<T>>::mutate(replacer_loc_id.unwrap(), |replacer_loc| {
+                        let mutable_replacer_loc = replacer_loc.as_mut().unwrap();
+                        mutable_replacer_loc.replacer_of = Some(loc_id);
+                    });
+                }
+    
+                if loc.loc_type == LocType::Collection && !loc.closed && loc.value_fee > 0_u32.into() {
+                    match loc.requester {
+                        Account(requester_account) => {
+                            T::Currency::unreserve(&requester_account, loc.value_fee);
+                        },
+                        _ => {},
+                    }
+                }
+    
+                Self::deposit_event(Event::LocVoid(loc_id));
+                Ok(().into())
             }
-            Self::deposit_event(Event::LocVoid(loc_id));
-            Ok(().into())
         }
 
         fn has_closed_identity_loc(
@@ -1493,6 +1490,7 @@ pub mod pallet {
                 collection_can_upload: false,
                 seal: None,
                 sponsorship_id: sponsorship_id.clone(),
+                value_fee: 0u32.into(),
             }
         }
 
@@ -1502,6 +1500,7 @@ pub mod pallet {
             collection_last_block_submission: Option<T::BlockNumber>,
             collection_max_size: Option<CollectionSize>,
             collection_can_upload: bool,
+            value_fee: BalanceOf<T>,
         ) -> LegalOfficerCaseOf<T> {
             LegalOfficerCaseOf::<T> {
                 owner: who.clone(),
@@ -1518,6 +1517,7 @@ pub mod pallet {
                 collection_can_upload,
                 seal: None,
                 sponsorship_id: None,
+                value_fee,
             }
         }
 
@@ -1569,6 +1569,17 @@ pub mod pallet {
                         mutable_loc.closed = true;
                         mutable_loc.seal = seal;
                     });
+
+                    if loc.loc_type == LocType::Collection && loc.value_fee > 0_u32.into() {
+                        match loc.requester {
+                            Account(requester_account) => {
+                                let (credit, _) = T::Currency::slash_reserved(&requester_account, loc.value_fee);
+                                T::RewardDistributor::distribute(credit, T::ValueFeeDistributionKey::get());
+                                Self::deposit_event(Event::ValueFeeWithdrawn(requester_account, loc.value_fee));
+                            },
+                            _ => {},
+                        }
+                    }
 
                     Self::deposit_event(Event::LocClosed(loc_id));
                     Ok(().into())
