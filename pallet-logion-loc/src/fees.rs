@@ -10,6 +10,7 @@ pub struct BalancesSnapshot {
     pub payer_account: AccountId,
     pub legal_officer_account: AccountId,
     pub payer: Balance,
+    pub payer_reserved: Balance,
     pub treasury: Balance,
     pub stakers: Balance,
     pub collators: Balance,
@@ -23,6 +24,7 @@ impl BalancesSnapshot {
             payer_account,
             legal_officer_account,
             payer: Self::get_free_balance(payer_account),
+            payer_reserved: Self::get_reserved_balance(payer_account),
             treasury: Self::get_free_balance(TREASURY_ACCOUNT_ID),
             stakers: Self::get_free_balance(STAKERS_ACCOUNT),
             collators: Self::get_free_balance(COLLATORS_ACCOUNT),
@@ -35,9 +37,14 @@ impl BalancesSnapshot {
         <Test as Config>::Currency::free_balance(account_id)
     }
 
+    fn get_reserved_balance(account_id: AccountId) -> Balance {
+        <Test as Config>::Currency::reserved_balance(account_id)
+    }
+
     pub fn delta_since(&self, previous: &BalancesSnapshot) -> BalancesDelta {
         BalancesDelta {
             payer: previous.payer.saturating_sub(Self::get_free_balance(previous.payer_account)),
+            payer_reserved: previous.payer_reserved.saturating_sub(Self::get_reserved_balance(previous.payer_account)),
             treasury: Self::get_free_balance(TREASURY_ACCOUNT_ID).saturating_sub(previous.treasury),
             stakers: Self::get_free_balance(STAKERS_ACCOUNT).saturating_sub(previous.stakers),
             collators: Self::get_free_balance(COLLATORS_ACCOUNT).saturating_sub(previous.collators),
@@ -51,6 +58,8 @@ impl BalancesSnapshot {
 pub struct BalancesDelta {
     /// Debited amount or 0 if credited
     payer: u128,
+    /// Debited amount from reserve or 0 if credited
+    payer_reserved: u128,
     /// Credited amount or 0 if debited
     treasury: u128,
     /// Credited amount or 0 if debited
@@ -71,6 +80,10 @@ impl BalancesDelta {
     pub fn total_debited(&self) -> u128 {
         self.payer
     }
+
+    pub fn total_debited_reserve(&self) -> u128 {
+        self.payer_reserved
+    }
 }
 
 /// Other fees than inclusion
@@ -80,11 +93,12 @@ pub struct Fees {
     /// When legal_fees is > 0, legal_fee_beneficiary must be some; should be none otherwise
     pub legal_fee_beneficiary: Option<Beneficiary<AccountId>>,
     pub certificate_fees: Balance,
+    pub value_fee: Balance,
 }
 impl Fees {
 
     pub fn total(&self) -> Balance {
-        self.storage_fees + self.legal_fees + self.certificate_fees
+        self.storage_fees + self.legal_fees + self.certificate_fees + self.value_fee
     }
 
     pub fn only_storage(num_of_files: u32, tot_size: u32) -> Fees {
@@ -93,6 +107,7 @@ impl Fees {
             legal_fees: 0,
             storage_fees: Self::storage_fees(num_of_files, tot_size),
             legal_fee_beneficiary: None,
+            value_fee: 0,
         }
     }
 
@@ -108,6 +123,7 @@ impl Fees {
             legal_fees: fee,
             storage_fees: 0,
             legal_fee_beneficiary: Some(beneficiary),
+            value_fee: 0,
         }
     }
 
@@ -119,7 +135,7 @@ impl Fees {
         let credited_fees: Balance = balances_delta.total_credited();
         assert_eq!(credited_fees, expected_fees_total);
     
-        let debited_fees = balances_delta.total_debited();
+        let debited_fees = balances_delta.total_debited() + balances_delta.total_debited_reserve();
         assert_eq!(debited_fees, expected_fees_total);
     
         if self.storage_fees > 0 {
@@ -141,6 +157,13 @@ impl Fees {
             System::assert_has_event(RuntimeEvent::LogionLoc(crate::Event::CertificateFeeWithdrawn {
                 0: previous_balances.payer_account,
                 1: self.certificate_fees,
+            }));
+        }
+
+        if self.value_fee > 0 {
+            System::assert_has_event(RuntimeEvent::LogionLoc(crate::Event::ValueFeeWithdrawn {
+                0: previous_balances.payer_account,
+                1: self.value_fee,
             }));
         }
     }

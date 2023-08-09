@@ -90,6 +90,7 @@ impl pallet_balances::Config for Test {
 pub const RESERVE_ACCOUNT: AccountId = 2;
 pub const COLLATORS_ACCOUNT: AccountId = 3;
 pub const STAKERS_ACCOUNT: AccountId = 4;
+pub const TREASURY_ACCOUNT: AccountId = 5;
 
 // Type used as beneficiary payout handle
 pub struct RewardDistributorImpl();
@@ -107,6 +108,10 @@ for RewardDistributorImpl
     fn payout_stakers(reward: NegativeImbalanceOf<Test>) {
         Balances::resolve_creating(&STAKERS_ACCOUNT, reward);
     }
+
+    fn payout_treasury(reward: NegativeImbalanceOf<Test>) {
+        Balances::resolve_creating(&TREASURY_ACCOUNT, reward);
+    }
 }
 
 pub const BLOCK_REWARD: Balance = 10_000_000_000_000_000_000; // 10 LGNT
@@ -117,6 +122,7 @@ parameter_types! {
         stakers_percent: Percent::from_percent(50),
         collators_percent: Percent::from_percent(30),
         reserve_percent: Percent::from_percent(20),
+        treasury_percent: Percent::from_percent(0),
     };
 }
 

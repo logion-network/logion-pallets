@@ -94,6 +94,7 @@ pub struct DistributionKey {
     pub reserve_percent: Percent,
     pub stakers_percent: Percent,
     pub collators_percent: Percent,
+    pub treasury_percent: Percent,
 }
 
 impl DistributionKey {
@@ -104,6 +105,7 @@ impl DistributionKey {
         should_become_zero = should_become_zero - Self::into_signed(self.reserve_percent);
         should_become_zero = should_become_zero - Self::into_signed(self.stakers_percent);
         should_become_zero = should_become_zero - Self::into_signed(self.collators_percent);
+        should_become_zero = should_become_zero - Self::into_signed(self.treasury_percent);
 
         should_become_zero == 0
     }
@@ -121,18 +123,23 @@ pub trait RewardDistributor<I: Imbalance<B>, B: Balance> {
 
     fn payout_stakers(reward: I);
 
+    fn payout_treasury(reward: I);
+
     fn distribute(amount: I, distribution_key: DistributionKey) {
         let amount_balance = amount.peek();
 
         let stakers_part = distribution_key.stakers_percent * amount_balance;
         let collators_part = distribution_key.collators_percent * amount_balance;
+        let treasury_part = distribution_key.treasury_percent * amount_balance;
 
-        let (stakers_imbalance, remainder) = amount.split(stakers_part);
-        let (collators_imbalance, reserve_imbalance) = remainder.split(collators_part);
+        let (stakers_imbalance, remainder1) = amount.split(stakers_part);
+        let (collators_imbalance, remainder2) = remainder1.split(collators_part);
+        let (treasury_imbalance, reserve_imbalance) = remainder2.split(treasury_part);
 
         Self::payout_stakers(stakers_imbalance);
         Self::payout_reserve(reserve_imbalance);
         Self::payout_collators(collators_imbalance);
+        Self::payout_treasury(treasury_imbalance);
     }
 
 }

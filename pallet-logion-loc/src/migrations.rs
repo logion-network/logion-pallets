@@ -7,6 +7,69 @@ use frame_support::traits::OnRuntimeUpgrade;
 use crate::{Config, PalletStorageVersion, pallet::StorageVersion};
 use super::*;
 
+pub mod v18 {
+    use super::*;
+    use crate::*;
+
+    #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+    pub struct LegalOfficerCaseV17<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId> {
+        owner: AccountId,
+        requester: Requester<AccountId, LocId, EthereumAddress>,
+        metadata: Vec<MetadataItem<AccountId, EthereumAddress, Hash>>,
+        files: Vec<File<Hash, AccountId, EthereumAddress>>,
+        closed: bool,
+        loc_type: LocType,
+        links: Vec<LocLink<LocId, Hash>>,
+        void_info: Option<LocVoidInfo<LocId>>,
+        replacer_of: Option<LocId>,
+        collection_last_block_submission: Option<BlockNumber>,
+        collection_max_size: Option<CollectionSize>,
+        collection_can_upload: bool,
+        seal: Option<Hash>,
+        sponsorship_id: Option<SponsorshipId>,
+    }
+
+    pub type LegalOfficerCaseV17Of<T> = LegalOfficerCaseV17<
+        <T as frame_system::Config>::AccountId,
+        <T as pallet::Config>::Hash,
+        <T as pallet::Config>::LocId,
+        <T as frame_system::Config>::BlockNumber,
+        <T as pallet::Config>::EthereumAddress,
+        <T as pallet::Config>::SponsorshipId,
+    >;
+
+    pub struct AddValueFee<T>(sp_std::marker::PhantomData<T>);
+    impl<T: Config> OnRuntimeUpgrade for AddValueFee<T> {
+        fn on_runtime_upgrade() -> Weight {
+            super::do_storage_upgrade::<T, _>(
+                StorageVersion::V17HashItemRecordPublicData,
+                StorageVersion::V18AddValueFee,
+                "AddValueFee",
+                || {
+                    LocMap::<T>::translate_values(|loc: LegalOfficerCaseV17Of<T>| {
+                        Some(LegalOfficerCase {
+                            owner: loc.owner,
+                            requester: loc.requester,
+                            metadata: loc.metadata,
+                            files: loc.files,
+                            closed: loc.closed,
+                            loc_type: loc.loc_type,
+                            links: loc.links,
+                            void_info: loc.void_info,
+                            replacer_of: loc.replacer_of,
+                            collection_last_block_submission: loc.collection_last_block_submission,
+                            collection_max_size: loc.collection_max_size,
+                            collection_can_upload: loc.collection_can_upload,
+                            seal: loc.seal,
+                            sponsorship_id: loc.sponsorship_id,
+                            value_fee: BalanceOf::<T>::from(0u32),
+                        })
+                    });
+                }
+            )
+        }
+    }
+}
 
 pub mod v17 {
     use super::*;

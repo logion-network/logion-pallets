@@ -144,6 +144,10 @@ for RewardDistributor
     fn payout_stakers(reward: NegativeImbalanceOf<Test>) {
         Balances::resolve_creating(&STAKERS_ACCOUNT, reward);
     }
+
+    fn payout_treasury(reward: NegativeImbalanceOf<Test>) {
+        Balances::resolve_creating(&TREASURY_ACCOUNT_ID, reward);
+    }
 }
 
 parameter_types! {
@@ -153,6 +157,7 @@ parameter_types! {
         stakers_percent: Percent::from_percent(50),
         collators_percent: Percent::from_percent(30),
         reserve_percent: Percent::from_percent(20),
+        treasury_percent: Percent::from_percent(0),
     };
     pub const ExchangeRate: Balance = 200_000_000_000_000_000; // 1 euro cent = 0.2 LGNT;
     pub const TreasuryAccountId: u64 = TREASURY_ACCOUNT_ID;
@@ -161,6 +166,13 @@ parameter_types! {
         stakers_percent: Percent::from_percent(50),
         collators_percent: Percent::from_percent(30),
         reserve_percent: Percent::from_percent(20),
+        treasury_percent: Percent::from_percent(0),
+    };
+    pub const ValueFeeDistributionKey: DistributionKey = DistributionKey {
+        stakers_percent: Percent::from_percent(0),
+        collators_percent: Percent::from_percent(0),
+        reserve_percent: Percent::from_percent(0),
+        treasury_percent: Percent::from_percent(100),
     };
 }
 
@@ -221,6 +233,7 @@ impl pallet_loc::Config for Test {
     type CertificateFee = CertificateFee;
     type CertificateFeeDistributionKey = CertificateFeeDistributionKey;
     type TokenIssuance = TokenIssuance;
+    type ValueFeeDistributionKey = ValueFeeDistributionKey;
 }
 
 // Build genesis storage according to the mock runtime.
