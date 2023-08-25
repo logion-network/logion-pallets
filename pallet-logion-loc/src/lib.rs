@@ -47,6 +47,7 @@ pub struct MetadataItem<AccountId, EthereumAddress, Hash> {
     value: Hash,
     submitter: SupportedAccountId<AccountId, EthereumAddress>,
     acknowledged: bool,
+    acknowledged_by_verified_issuer: bool,
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
@@ -69,6 +70,7 @@ pub struct File<Hash, AccountId, EthereumAddress> {
     submitter: SupportedAccountId<AccountId, EthereumAddress>,
     size: u32,
     acknowledged: bool,
+    acknowledged_by_verified_issuer: bool,
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
@@ -266,6 +268,7 @@ pub mod pallet {
         LocQuery, LocValidity, IsLegalOfficer, RewardDistributor,
         DistributionKey, LegalFee, EuroCent, Beneficiary,
     };
+    use crate::SupportedAccountId::Polkadot;
     use super::*;
     pub use crate::weights::WeightInfo;
 
@@ -603,11 +606,12 @@ pub mod pallet {
         V16MoveTokenIssuance,
         V17HashItemRecordPublicData,
         V18AddValueFee,
+        V19AcknowledgeItemsByIssuer,
     }
 
     impl Default for StorageVersion {
         fn default() -> StorageVersion {
-            return StorageVersion::V18AddValueFee;
+            return StorageVersion::V19AcknowledgeItemsByIssuer;
         }
     }
 
@@ -788,18 +792,13 @@ pub mod pallet {
                 Err(Error::<T>::NotFound)?
             } else {
                 let loc = <LocMap<T>>::get(&loc_id).unwrap();
-                let submitted_by_owner: bool = loc.owner == who;
-                if !submitted_by_owner && (
-                    item.submitter != SupportedAccountId::Polkadot(who) ||
-                    !Self::can_submit(&loc_id, &loc, &item.submitter)
-                ) {
-                    Err(Error::<T>::Unauthorized)?
+                let published_by_owner: bool = Self::is_published_by_owner(&loc, &who)?;
+                if !Self::is_valid_submitter(&loc_id, &loc, &item.submitter, published_by_owner) {
+                    Err(Error::<T>::CannotSubmit)?
                 } else if loc.closed {
                     Err(Error::<T>::CannotMutate)?
                 } else if loc.void_info.is_some() {
                     Err(Error::<T>::CannotMutateVoid)?
-                } else if submitted_by_owner && !Self::can_submit(&loc_id, &loc, &item.submitter) {
-                    Err(Error::<T>::CannotSubmit)?
                 } else {
                     if loc.metadata.iter().find(|metadata_item| metadata_item.name == item.name).is_some() {
                         Err(Error::<T>::DuplicateLocMetadata)?
@@ -810,7 +809,8 @@ pub mod pallet {
                             name: item.name,
                             value: item.value,
                             submitter: item.submitter,
-                            acknowledged: submitted_by_owner,
+                            acknowledged: published_by_owner,
+                            acknowledged_by_verified_issuer: false,
                         });
                     });
                     Ok(().into())
@@ -832,18 +832,13 @@ pub mod pallet {
                 Err(Error::<T>::NotFound)?
             } else {
                 let loc = <LocMap<T>>::get(&loc_id).unwrap();
-                let submitted_by_owner: bool = loc.owner == who;
-                if !submitted_by_owner && (
-                    file.submitter != SupportedAccountId::Polkadot(who) ||
-                        !Self::can_submit(&loc_id, &loc, &file.submitter)
-                ) {
-                    Err(Error::<T>::Unauthorized)?
+                let published_by_owner: bool = Self::is_published_by_owner(&loc, &who)?;
+                if !Self::is_valid_submitter(&loc_id, &loc, &file.submitter, published_by_owner) {
+                    Err(Error::<T>::CannotSubmit)?
                 } else if loc.closed {
                     Err(Error::<T>::CannotMutate)?
                 } else if loc.void_info.is_some() {
                     Err(Error::<T>::CannotMutateVoid)?
-                } else if !Self::can_submit(&loc_id, &loc, &file.submitter) {
-                    Err(Error::<T>::CannotSubmit)?
                 } else {
                     if loc.files.iter().find(|item| item.hash == file.hash).is_some() {
                         Err(Error::<T>::DuplicateLocFile)?
@@ -866,7 +861,8 @@ pub mod pallet {
                             nature: file.nature,
                             submitter: file.submitter,
                             size: file.size,
-                            acknowledged: submitted_by_owner,
+                            acknowledged: published_by_owner,
+                            acknowledged_by_verified_issuer: false,
                         });
                     });
                     Ok(().into())
@@ -1222,13 +1218,15 @@ pub mod pallet {
             #[pallet::compact] loc_id: T::LocId,
             name: <T as pallet::Config>::Hash,
         ) -> DispatchResultWithPostInfo {
-            let who = T::IsLegalOfficer::ensure_origin(origin.clone())?;
+            let who = ensure_signed(origin)?;
 
             if !<LocMap<T>>::contains_key(&loc_id) {
                 Err(Error::<T>::NotFound)?
             } else {
                 let loc = <LocMap<T>>::get(&loc_id).unwrap();
-                if loc.owner != who {
+                let ack_by_owner = loc.owner == who;
+                let ack_by_verified_issuer = Self::verified_issuers_by_loc(loc_id, &who).is_some();
+                if !ack_by_owner && !ack_by_verified_issuer {
                     Err(Error::<T>::Unauthorized)?
                 } else if loc.closed {
                     Err(Error::<T>::CannotMutate)?
@@ -1240,12 +1238,29 @@ pub mod pallet {
                     Err(Error::<T>::ItemNotFound)?
                 } else {
                     let item_index = option_item_index.unwrap();
-                    if loc.metadata[item_index].acknowledged {
+                    if ack_by_owner && loc.metadata[item_index].acknowledged {
                         Err(Error::<T>::ItemAlreadyAcknowledged)?
+                    }
+                    if ack_by_verified_issuer {
+                        if loc.metadata[item_index].acknowledged_by_verified_issuer {
+                            Err(Error::<T>::ItemAlreadyAcknowledged)?
+                        }
+                        match &loc.metadata[item_index].submitter {
+                            Polkadot(polkadot_submitter) => {
+                                if *polkadot_submitter != who {
+                                    Err(Error::<T>::Unauthorized)?
+                                }
+                            },
+                            _ => Err(Error::<T>::Unauthorized)?
+                        }
                     }
                     <LocMap<T>>::mutate(loc_id, |loc| {
                         let mutable_loc = loc.as_mut().unwrap();
-                        mutable_loc.metadata[item_index].acknowledged = true;
+                        if ack_by_owner {
+                            mutable_loc.metadata[item_index].acknowledged = true;
+                        } else {
+                            mutable_loc.metadata[item_index].acknowledged_by_verified_issuer = true;
+                        }
                     });
                     Ok(().into())
                 }
@@ -1260,13 +1275,15 @@ pub mod pallet {
             #[pallet::compact] loc_id: T::LocId,
             hash: <T as pallet::Config>::Hash,
         ) -> DispatchResultWithPostInfo {
-            let who = T::IsLegalOfficer::ensure_origin(origin.clone())?;
+            let who = ensure_signed(origin)?;
 
             if !<LocMap<T>>::contains_key(&loc_id) {
                 Err(Error::<T>::NotFound)?
             } else {
                 let loc = <LocMap<T>>::get(&loc_id).unwrap();
-                if loc.owner != who {
+                let ack_by_owner = loc.owner == who;
+                let ack_by_verified_issuer = Self::verified_issuers_by_loc(loc_id, &who).is_some();
+                if !ack_by_owner && !ack_by_verified_issuer {
                     Err(Error::<T>::Unauthorized)?
                 } else if loc.closed {
                     Err(Error::<T>::CannotMutate)?
@@ -1278,12 +1295,29 @@ pub mod pallet {
                     Err(Error::<T>::ItemNotFound)?
                 } else {
                     let item_index = option_item_index.unwrap();
-                    if loc.files[item_index].acknowledged {
+                    if ack_by_owner && loc.files[item_index].acknowledged {
                         Err(Error::<T>::ItemAlreadyAcknowledged)?
+                    }
+                    if ack_by_verified_issuer {
+                        if loc.files[item_index].acknowledged_by_verified_issuer {
+                            Err(Error::<T>::ItemAlreadyAcknowledged)?
+                        }
+                        match &loc.files[item_index].submitter {
+                            Polkadot(polkadot_submitter) => {
+                                if *polkadot_submitter != who {
+                                    Err(Error::<T>::Unauthorized)?
+                                }
+                            },
+                            _ => Err(Error::<T>::Unauthorized)?
+                        }
                     }
                     <LocMap<T>>::mutate(loc_id, |loc| {
                         let mutable_loc = loc.as_mut().unwrap();
-                        mutable_loc.files[item_index].acknowledged = true;
+                        if ack_by_owner {
+                            mutable_loc.files[item_index].acknowledged = true;
+                        } else {
+                            mutable_loc.files[item_index].acknowledged_by_verified_issuer = true;
+                        }
                     });
                     Ok(().into())
                 }
@@ -1707,23 +1741,49 @@ pub mod pallet {
                 && collection_loc.void_info.is_none()
         }
 
-        fn can_submit(loc_id: &T::LocId, loc: &LegalOfficerCaseOf<T>, submitter: &SupportedAccountId<T::AccountId, T::EthereumAddress>) -> bool {
-            match &submitter {
-                SupportedAccountId::Polkadot(pokadot_submitter) => *pokadot_submitter == loc.owner
-                    || match &loc.requester {
-                        Account(requester_account) => *pokadot_submitter == *requester_account,
-                        _ => false
-                    }
-                    || Self::verified_issuers_by_loc(loc_id, pokadot_submitter).is_some(),
-                SupportedAccountId::Other(other_submitter) => match &other_submitter {
-                    OtherAccountId::Ethereum(ethereum_submitter) => match &loc.requester {
-                        Requester::OtherAccount(other_requester) => match &other_requester {
-                            OtherAccountId::Ethereum(ethereum_requester) => *ethereum_submitter == *ethereum_requester,
+        fn is_valid_submitter(loc_id: &T::LocId, loc: &LegalOfficerCaseOf<T>, submitter: &SupportedAccountId<T::AccountId, T::EthereumAddress>, published_by_owner: bool) -> bool {
+
+            let polkadot_requester: Option<&T::AccountId> = match &loc.requester {
+                Account(requester_account) => Some(requester_account),
+                _ => None
+            };
+            if published_by_owner {
+                match &submitter {
+                    SupportedAccountId::Polkadot(polkadot_submitter) => *polkadot_submitter == loc.owner ||
+                        (polkadot_requester.is_none() && Self::verified_issuers_by_loc(loc_id, polkadot_submitter).is_some()),
+                    SupportedAccountId::Other(other_submitter) => match &other_submitter {
+                        OtherAccountId::Ethereum(ethereum_submitter) => match &loc.requester {
+                            Requester::OtherAccount(other_requester) => match &other_requester {
+                                OtherAccountId::Ethereum(ethereum_requester) => *ethereum_submitter == *ethereum_requester,
+                            },
+                            _ => false,
                         },
-                        _ => false,
                     },
+                    _ => false,
                 }
-                _ => false,
+            } else { // published_by_requester
+                match &submitter {
+                    SupportedAccountId::Polkadot(polkadot_submitter) =>
+                        *polkadot_submitter == polkadot_requester.unwrap().clone() || Self::verified_issuers_by_loc(loc_id, polkadot_submitter).is_some(),
+                    _ => false
+                }
+            }
+        }
+
+        fn is_published_by_owner(loc: &LegalOfficerCaseOf<T>, who: &T::AccountId) -> Result<bool, sp_runtime::DispatchError> {
+            let published_by_owner: bool = loc.owner == who.clone();
+            if published_by_owner {
+                return Ok(true);
+            }
+            let published_by_requester: bool =
+                match &loc.requester {
+                    Account(requester_account) => *requester_account == *who,
+                    _ => false
+                };
+            if !published_by_requester {
+                Err(Error::<T>::Unauthorized.into())
+            } else {
+                Ok(published_by_owner)
             }
         }
 
