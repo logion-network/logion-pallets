@@ -65,9 +65,9 @@ pub mod v19 {
         BalanceOf<T>,
     >;
 
-    pub struct HashLocPublicData<T>(sp_std::marker::PhantomData<T>);
+    pub struct AcknowledgeItemsByIssuer<T>(sp_std::marker::PhantomData<T>);
 
-    impl<T: Config> HashLocPublicData<T> {
+    impl<T: Config> AcknowledgeItemsByIssuer<T> {
 
         fn acknowledged_by_verified_issuer(loc: &LegalOfficerCaseV18Of<T>, submitter: &SupportedAccountId<T::AccountId, T::EthereumAddress>) -> bool {
             // Any polkadot submitter different from owner or requester, will be assumed to be verified issuer.
@@ -87,13 +87,13 @@ pub mod v19 {
             }
         }
     }
-    impl<T: Config> OnRuntimeUpgrade for HashLocPublicData<T> {
+    impl<T: Config> OnRuntimeUpgrade for AcknowledgeItemsByIssuer<T> {
 
         fn on_runtime_upgrade() -> Weight {
             super::do_storage_upgrade::<T, _>(
                 StorageVersion::V18AddValueFee,
                 StorageVersion::V19AcknowledgeItemsByIssuer,
-                "HashLocPublicData",
+                "AcknowledgeItemsByIssuer",
                 || {
                     LocMap::<T>::translate_values(|loc: LegalOfficerCaseV18Of<T>| {
                         let files: Vec<File<<T as pallet::Config>::Hash, <T as frame_system::Config>::AccountId, T::EthereumAddress>> = loc.files
@@ -103,8 +103,8 @@ pub mod v19 {
                                 nature: file.nature,
                                 submitter: file.submitter.clone(),
                                 size: file.size,
-                                acknowledged: file.acknowledged,
-                                acknowledged_by_verified_issuer: Self::acknowledged_by_verified_issuer(&loc,&file.submitter),
+                                acknowledged_by_owner: file.acknowledged,
+                                acknowledged_by_verified_issuer: Self::acknowledged_by_verified_issuer(&loc, &file.submitter),
                             })
                             .collect();
                         let metadata: Vec<MetadataItem<<T as frame_system::Config>::AccountId, T::EthereumAddress, <T as pallet::Config>::Hash>> = loc.metadata
@@ -113,8 +113,8 @@ pub mod v19 {
                                 name: item.name,
                                 value: item.value,
                                 submitter: item.submitter.clone(),
-                                acknowledged: item.acknowledged,
-                                acknowledged_by_verified_issuer: Self::acknowledged_by_verified_issuer(&loc,&item.submitter),
+                                acknowledged_by_owner: item.acknowledged,
+                                acknowledged_by_verified_issuer: Self::acknowledged_by_verified_issuer(&loc, &item.submitter),
                             })
                             .collect();
                         Some(LegalOfficerCaseOf::<T> {

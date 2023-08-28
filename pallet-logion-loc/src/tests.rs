@@ -193,12 +193,12 @@ fn sha256(data: &Vec<u8>) -> H256 {
     <SHA256 as Hasher<H256>>::hash(data)
 }
 
-fn expected_metadata(metadata: MetadataItemParams<AccountId, EthereumAddress, crate::mock::Hash>, acknowledged: bool, acknowledged_by_verified_issuer: bool) -> MetadataItem<AccountId, EthereumAddress, crate::mock::Hash> {
+fn expected_metadata(metadata: MetadataItemParams<AccountId, EthereumAddress, crate::mock::Hash>, acknowledged_by_owner: bool, acknowledged_by_verified_issuer: bool) -> MetadataItem<AccountId, EthereumAddress, crate::mock::Hash> {
     return MetadataItem {
         name: metadata.name,
         value: metadata.value,
         submitter: metadata.submitter,
-        acknowledged,
+        acknowledged_by_owner,
         acknowledged_by_verified_issuer,
     };
 }
@@ -236,12 +236,42 @@ fn it_adds_metadata_when_caller_is_requester() {
 }
 
 #[test]
-fn it_acknowledges_metadata() {
+fn it_acknowledges_metadata_as_owner() {
     new_test_ext().execute_with(|| {
         let metadata = create_loc_with_metadata_from_requester();
         assert_ok!(LogionLoc::acknowledge_metadata(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, metadata.name.clone()));
         let loc = LogionLoc::loc(LOC_ID).unwrap();
         assert_eq!(loc.metadata[0], expected_metadata(metadata.clone(), ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_acknowledges_metadata_as_verified_issuer() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        create_collection_and_nominated_issuer();
+        assert_ok!(LogionLoc::set_issuer_selection(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, ISSUER_ID1, true));
+        let metadata = MetadataItemParams {
+            name: sha256(&vec![1, 2, 3]),
+            value: sha256(&vec![4, 5, 6]),
+            submitter: SupportedAccountId::Polkadot(ISSUER_ID1),
+        };
+        assert_ok!(LogionLoc::add_metadata(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, metadata.clone()));
+
+        assert_ok!(LogionLoc::acknowledge_metadata(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, metadata.name.clone()));
+
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.metadata[0], expected_metadata(metadata.clone(), NOT_ACKNOWLEDGED, ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_to_acknowledge_requester_metadata_as_issuer() {
+    new_test_ext().execute_with(|| {
+        let metadata = create_loc_with_metadata_from_requester();
+        assert_err!(LogionLoc::acknowledge_metadata(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, metadata.name.clone()), Error::<Test>::Unauthorized);
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.metadata[0], expected_metadata(metadata.clone(), NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
     });
 }
 
@@ -370,13 +400,13 @@ fn it_adds_file_when_caller_owner_and_submitter_is_owner() {
     });
 }
 
-fn expected_file(file: &FileParams<H256, AccountId, EthereumAddress>, acknowledged: bool, acknowledged_by_verified_issuer: bool) -> File<H256, AccountId, EthereumAddress> {
+fn expected_file(file: &FileParams<H256, AccountId, EthereumAddress>, acknowledged_by_owner: bool, acknowledged_by_verified_issuer: bool) -> File<H256, AccountId, EthereumAddress> {
     return File {
         hash: file.hash,
         nature: file.nature.clone(),
         submitter: file.submitter,
         size: file.size,
-        acknowledged,
+        acknowledged_by_owner,
         acknowledged_by_verified_issuer,
     }
 }
@@ -431,6 +461,36 @@ fn it_acknowledges_file() {
     });
 }
 
+#[test]
+fn it_acknowledges_file_as_verified_issuer() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        create_collection_and_nominated_issuer();
+        assert_ok!(LogionLoc::set_issuer_selection(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, ISSUER_ID1, true));
+        let file = FileParams {
+            hash: sha256(&vec![1, 2, 3]),
+            nature: sha256(&vec![4, 5, 6]),
+            submitter: SupportedAccountId::Polkadot(ISSUER_ID1),
+            size: 456,
+        };
+        assert_ok!(LogionLoc::add_file(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, file.clone()));
+
+        assert_ok!(LogionLoc::acknowledge_file(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, file.hash.clone()));
+
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.files[0], expected_file(&file, NOT_ACKNOWLEDGED, ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_to_acknowledge_requester_file_as_issuer() {
+    new_test_ext().execute_with(|| {
+        let file = create_loc_with_file_from_requester();
+        assert_err!(LogionLoc::acknowledge_file(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, file.hash.clone()), Error::<Test>::Unauthorized);
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.files[0], expected_file(&file, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
 #[test]
 fn it_fails_to_acknowledge_unknown_file() {
     new_test_ext().execute_with(|| {
@@ -513,11 +573,11 @@ fn it_fails_adding_file_when_insufficient_funds() {
         let file = FileParams {
             hash: sha256(&"test".as_bytes().to_vec()),
             nature: sha256(&"test-file-nature".as_bytes().to_vec()),
-            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
             size: FILE_SIZE,
         };
         let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
-        assert_err!(LogionLoc::add_file(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, file.clone()), Error::<Test>::InsufficientFunds);
+        assert_err!(LogionLoc::add_file(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, file.clone()), Error::<Test>::InsufficientFunds);
         check_no_fees(snapshot);
     });
 }
@@ -1384,7 +1444,7 @@ fn it_selects_an_issuer() {
 
         assert_ok!(LogionLoc::set_issuer_selection(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, ISSUER_ID1, true));
 
-        assert_eq!(LogionLoc::verified_issuers_by_loc(LOC_ID, ISSUER_ID1), Some(()));
+        assert_eq!(LogionLoc::selected_verified_issuers(LOC_ID, ISSUER_ID1), Some(()));
         assert_eq!(LogionLoc::locs_by_verified_issuer((ISSUER_ID1, LOC_OWNER1, LOC_ID)), Some(()));
     });
 }
@@ -1463,7 +1523,7 @@ fn it_unselects_an_issuer() {
 
         assert_ok!(LogionLoc::set_issuer_selection(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, ISSUER_ID1, false));
 
-        assert_eq!(LogionLoc::verified_issuers_by_loc(LOC_ID, ISSUER_ID1), None);
+        assert_eq!(LogionLoc::selected_verified_issuers(LOC_ID, ISSUER_ID1), None);
         assert_eq!(LogionLoc::locs_by_verified_issuer((ISSUER_ID1, LOC_OWNER1, LOC_ID)), None);
     });
 }
@@ -1520,15 +1580,15 @@ fn it_unselects_issuer_on_dismiss() {
         create_closed_collection_with_selected_issuer();
         nominate_issuer(ISSUER_ID2, ISSUER2_IDENTITY_LOC_ID);
         assert_ok!(LogionLoc::set_issuer_selection(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, ISSUER_ID2, true));
-        assert!(LogionLoc::verified_issuers_by_loc(LOC_ID, ISSUER_ID1).is_some());
-        assert!(LogionLoc::verified_issuers_by_loc(LOC_ID, ISSUER_ID2).is_some());
+        assert!(LogionLoc::selected_verified_issuers(LOC_ID, ISSUER_ID1).is_some());
+        assert!(LogionLoc::selected_verified_issuers(LOC_ID, ISSUER_ID2).is_some());
         assert!(LogionLoc::locs_by_verified_issuer((ISSUER_ID1, LOC_OWNER1, LOC_ID)).is_some());
         assert!(LogionLoc::locs_by_verified_issuer((ISSUER_ID2, LOC_OWNER1, LOC_ID)).is_some());
 
         assert_ok!(LogionLoc::dismiss_issuer(RuntimeOrigin::signed(LOC_OWNER1), ISSUER_ID1));
 
-        assert!(LogionLoc::verified_issuers_by_loc(LOC_ID, ISSUER_ID1).is_none());
-        assert!(LogionLoc::verified_issuers_by_loc(LOC_ID, ISSUER_ID2).is_some());
+        assert!(LogionLoc::selected_verified_issuers(LOC_ID, ISSUER_ID1).is_none());
+        assert!(LogionLoc::selected_verified_issuers(LOC_ID, ISSUER_ID2).is_some());
         assert!(LogionLoc::locs_by_verified_issuer((ISSUER_ID1, LOC_OWNER1, LOC_ID)).is_none());
         assert!(LogionLoc::locs_by_verified_issuer((ISSUER_ID2, LOC_OWNER1, LOC_ID)).is_some());
     });
@@ -1740,50 +1800,6 @@ fn it_fails_adding_tokens_record_when_insufficient_funds() {
     });
 }
 
-#[test]
-fn it_adds_file_on_logion_identity_loc_when_caller_is_owner_and_submitter_is_issuer() {
-    new_test_ext().execute_with(|| {
-        setup_default_balances();
-        assert_ok!(LogionLoc::create_logion_identity_loc(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
-        nominated_and_select_issuer(LOC_ID);
-        let file = FileParams {
-            hash: sha256(&"test".as_bytes().to_vec()),
-            nature: sha256(&"test-file-nature".as_bytes().to_vec()),
-            submitter: SupportedAccountId::Polkadot(ISSUER_ID1),
-            size: FILE_SIZE,
-        };
-        let snapshot = BalancesSnapshot::take(LOC_OWNER1, LOC_OWNER1);
-        assert_ok!(LogionLoc::add_file(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, file.clone()));
-        let loc = LogionLoc::loc(LOC_ID).unwrap();
-        assert_eq!(loc.files[0], expected_file(&file, ACKNOWLEDGED, NOT_ACKNOWLEDGED));
-
-        let fees = Fees::only_storage(1, FILE_SIZE);
-        fees.assert_balances_events(snapshot);
-    });
-}
-
-#[test]
-fn it_adds_file_on_logion_identity_loc_when_caller_and_submitter_is_issuer() {
-    new_test_ext().execute_with(|| {
-        setup_default_balances();
-        assert_ok!(LogionLoc::create_logion_identity_loc(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
-        nominated_and_select_issuer(LOC_ID);
-        let file = FileParams {
-            hash: sha256(&"test".as_bytes().to_vec()),
-            nature: sha256(&"test-file-nature".as_bytes().to_vec()),
-            submitter: SupportedAccountId::Polkadot(ISSUER_ID1),
-            size: FILE_SIZE,
-        };
-        let snapshot = BalancesSnapshot::take(LOC_OWNER1, LOC_OWNER1);
-        assert_ok!(LogionLoc::add_file(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, file.clone()));
-        let loc = LogionLoc::loc(LOC_ID).unwrap();
-        assert_eq!(loc.files[0], expected_file(&file, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
-
-        let fees = Fees::only_storage(1, FILE_SIZE);
-        fees.assert_balances_events(snapshot);
-    });
-}
-
 fn nominated_and_select_issuer(loc_id: u32) {
     nominate_issuer(ISSUER_ID1, ISSUER1_IDENTITY_LOC_ID);
     assert_ok!(LogionLoc::set_issuer_selection(RuntimeOrigin::signed(LOC_OWNER1), loc_id, ISSUER_ID1, true));
@@ -1823,21 +1839,6 @@ fn it_fails_adding_file_on_polkadot_transaction_loc_cannot_submit() {
             size: FILE_SIZE,
         };
         assert_err!(LogionLoc::add_file(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, file.clone()), Error::<Test>::CannotSubmit);
-    });
-}
-
-#[test]
-fn it_adds_metadata_on_logion_identity_loc_for_when_submitter_is_issuer() {
-    new_test_ext().execute_with(|| {
-        setup_default_balances();
-        assert_ok!(LogionLoc::create_logion_identity_loc(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
-        nominated_and_select_issuer(LOC_ID);
-        let metadata = MetadataItemParams {
-            name: sha256(&vec![1, 2, 3]),
-            value: sha256(&vec![4, 5, 6]),
-            submitter: SupportedAccountId::Polkadot(ISSUER_ID1),
-        };
-        assert_ok!(LogionLoc::add_metadata(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, metadata.clone()));
     });
 }
 

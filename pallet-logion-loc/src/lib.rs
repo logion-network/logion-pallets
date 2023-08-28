@@ -46,7 +46,7 @@ pub struct MetadataItem<AccountId, EthereumAddress, Hash> {
     name: Hash,
     value: Hash,
     submitter: SupportedAccountId<AccountId, EthereumAddress>,
-    acknowledged: bool,
+    acknowledged_by_owner: bool,
     acknowledged_by_verified_issuer: bool,
 }
 
@@ -69,7 +69,7 @@ pub struct File<Hash, AccountId, EthereumAddress> {
     nature: Hash,
     submitter: SupportedAccountId<AccountId, EthereumAddress>,
     size: u32,
-    acknowledged: bool,
+    acknowledged_by_owner: bool,
     acknowledged_by_verified_issuer: bool,
 }
 
@@ -418,7 +418,7 @@ pub mod pallet {
 
     /// Verified Issuers by LOC
     #[pallet::storage]
-    #[pallet::getter(fn verified_issuers_by_loc)]
+    #[pallet::getter(fn selected_verified_issuers)]
     pub type VerifiedIssuersByLocMap<T> = StorageDoubleMap<
         _,
         Blake2_128Concat,
@@ -809,7 +809,7 @@ pub mod pallet {
                             name: item.name,
                             value: item.value,
                             submitter: item.submitter,
-                            acknowledged: published_by_owner,
+                            acknowledged_by_owner: published_by_owner,
                             acknowledged_by_verified_issuer: false,
                         });
                     });
@@ -861,7 +861,7 @@ pub mod pallet {
                             nature: file.nature,
                             submitter: file.submitter,
                             size: file.size,
-                            acknowledged: published_by_owner,
+                            acknowledged_by_owner: published_by_owner,
                             acknowledged_by_verified_issuer: false,
                         });
                     });
@@ -1055,7 +1055,7 @@ pub mod pallet {
                 } else if Self::verified_issuers(&who, &issuer).is_none() {
                     Err(Error::<T>::NotNominated)?
                 } else {
-                    let already_issuer = Self::verified_issuers_by_loc(loc_id, &issuer);
+                    let already_issuer = Self::selected_verified_issuers(loc_id, &issuer);
                     if already_issuer.is_some() && !selected {
                         <VerifiedIssuersByLocMap<T>>::remove(loc_id, &issuer);
                         <LocsByVerifiedIssuerMap<T>>::remove((&issuer, loc.owner, loc_id));
@@ -1225,7 +1225,7 @@ pub mod pallet {
             } else {
                 let loc = <LocMap<T>>::get(&loc_id).unwrap();
                 let ack_by_owner = loc.owner == who;
-                let ack_by_verified_issuer = Self::verified_issuers_by_loc(loc_id, &who).is_some();
+                let ack_by_verified_issuer = Self::selected_verified_issuers(loc_id, &who).is_some();
                 if !ack_by_owner && !ack_by_verified_issuer {
                     Err(Error::<T>::Unauthorized)?
                 } else if loc.closed {
@@ -1238,7 +1238,7 @@ pub mod pallet {
                     Err(Error::<T>::ItemNotFound)?
                 } else {
                     let item_index = option_item_index.unwrap();
-                    if ack_by_owner && loc.metadata[item_index].acknowledged {
+                    if ack_by_owner && loc.metadata[item_index].acknowledged_by_owner {
                         Err(Error::<T>::ItemAlreadyAcknowledged)?
                     }
                     if ack_by_verified_issuer {
@@ -1257,7 +1257,7 @@ pub mod pallet {
                     <LocMap<T>>::mutate(loc_id, |loc| {
                         let mutable_loc = loc.as_mut().unwrap();
                         if ack_by_owner {
-                            mutable_loc.metadata[item_index].acknowledged = true;
+                            mutable_loc.metadata[item_index].acknowledged_by_owner = true;
                         } else {
                             mutable_loc.metadata[item_index].acknowledged_by_verified_issuer = true;
                         }
@@ -1282,7 +1282,7 @@ pub mod pallet {
             } else {
                 let loc = <LocMap<T>>::get(&loc_id).unwrap();
                 let ack_by_owner = loc.owner == who;
-                let ack_by_verified_issuer = Self::verified_issuers_by_loc(loc_id, &who).is_some();
+                let ack_by_verified_issuer = Self::selected_verified_issuers(loc_id, &who).is_some();
                 if !ack_by_owner && !ack_by_verified_issuer {
                     Err(Error::<T>::Unauthorized)?
                 } else if loc.closed {
@@ -1295,7 +1295,7 @@ pub mod pallet {
                     Err(Error::<T>::ItemNotFound)?
                 } else {
                     let item_index = option_item_index.unwrap();
-                    if ack_by_owner && loc.files[item_index].acknowledged {
+                    if ack_by_owner && loc.files[item_index].acknowledged_by_owner {
                         Err(Error::<T>::ItemAlreadyAcknowledged)?
                     }
                     if ack_by_verified_issuer {
@@ -1314,7 +1314,7 @@ pub mod pallet {
                     <LocMap<T>>::mutate(loc_id, |loc| {
                         let mutable_loc = loc.as_mut().unwrap();
                         if ack_by_owner {
-                            mutable_loc.files[item_index].acknowledged = true;
+                            mutable_loc.files[item_index].acknowledged_by_owner = true;
                         } else {
                             mutable_loc.files[item_index].acknowledged_by_verified_issuer = true;
                         }
@@ -1623,12 +1623,12 @@ pub mod pallet {
 
         fn has_unacknowledged_items(loc: &LegalOfficerCaseOf<T>) -> bool {
             let unacknowledged_files = loc.files.iter()
-                .find(|file| { !file.acknowledged }).is_some();
+                .find(|file| { !file.acknowledged_by_owner }).is_some();
             if unacknowledged_files {
                 true
             } else {
                 loc.metadata.iter()
-                    .find(|item| { !item.acknowledged }).is_some()
+                    .find(|item| { !item.acknowledged_by_owner }).is_some()
             }
         }
 
@@ -1735,7 +1735,7 @@ pub mod pallet {
                 && (
                     match &collection_loc.requester { Account(requester) => requester == adder, _ => false }
                     || *adder == collection_loc.owner
-                    || Self::verified_issuers_by_loc(loc_id, adder).is_some()
+                    || Self::selected_verified_issuers(loc_id, adder).is_some()
                 )
                 && collection_loc.closed
                 && collection_loc.void_info.is_none()
@@ -1749,8 +1749,7 @@ pub mod pallet {
             };
             if published_by_owner {
                 match &submitter {
-                    SupportedAccountId::Polkadot(polkadot_submitter) => *polkadot_submitter == loc.owner ||
-                        (polkadot_requester.is_none() && Self::verified_issuers_by_loc(loc_id, polkadot_submitter).is_some()),
+                    SupportedAccountId::Polkadot(polkadot_submitter) => *polkadot_submitter == loc.owner,
                     SupportedAccountId::Other(other_submitter) => match &other_submitter {
                         OtherAccountId::Ethereum(ethereum_submitter) => match &loc.requester {
                             Requester::OtherAccount(other_requester) => match &other_requester {
@@ -1764,7 +1763,7 @@ pub mod pallet {
             } else { // published_by_requester
                 match &submitter {
                     SupportedAccountId::Polkadot(polkadot_submitter) =>
-                        *polkadot_submitter == polkadot_requester.unwrap().clone() || Self::verified_issuers_by_loc(loc_id, polkadot_submitter).is_some(),
+                        *polkadot_submitter == polkadot_requester.unwrap().clone() || Self::selected_verified_issuers(loc_id, polkadot_submitter).is_some(),
                     _ => false
                 }
             }
