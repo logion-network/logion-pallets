@@ -581,7 +581,20 @@ pub mod pallet {
 
         #[cfg(feature = "try-runtime")]
         fn post_upgrade(_state: Vec<u8>) -> Result<(), sp_runtime::DispatchError> {
+
             assert_eq!(PalletStorageVersion::<T>::get(), StorageVersion::default());
+
+            LocMap::<T>::iter().for_each(|entry| {
+                let loc_id = entry.0;
+                let loc = entry.1;
+                loc.metadata.iter().for_each(|metadata| {
+                    log::info!("LOC {:?} metadata {:?} acknowledged_by_owner {:?} acknowledged_by_verified_issuer {:?}", loc_id, metadata.name, metadata.acknowledged_by_owner, metadata.acknowledged_by_verified_issuer);
+                });
+                loc.files.iter().for_each(|file| {
+                    log::info!("LOC {:?} file {:?} acknowledged_by_owner {:?} acknowledged_by_verified_issuer {:?}", loc_id, file.hash, file.acknowledged_by_owner, file.acknowledged_by_verified_issuer);
+                });
+            });
+
             Ok(())
         }
     }
