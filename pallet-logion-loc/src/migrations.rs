@@ -69,14 +69,14 @@ pub mod v19 {
 
     impl<T: Config> AcknowledgeItemsByIssuer<T> {
 
-        fn acknowledged_by_verified_issuer(loc: &LegalOfficerCaseV18Of<T>, submitter: &SupportedAccountId<T::AccountId, T::EthereumAddress>) -> bool {
+        pub fn acknowledged_by_verified_issuer(owner: &T::AccountId, requester: &RequesterOf<T>, submitter: &SupportedAccountId<T::AccountId, T::EthereumAddress>) -> bool {
             // Any polkadot submitter different from owner or requester, will be assumed to be verified issuer.
             match submitter {
                 SupportedAccountId::Polkadot(polkadot_submitter) => {
-                    if *polkadot_submitter == loc.owner {
+                    if *polkadot_submitter == owner.clone() {
                         false
                     } else {
-                        let submitted_by_requester = match &loc.requester {
+                        let submitted_by_requester = match requester {
                             Account(polkadot_requester) => polkadot_requester == polkadot_submitter,
                             _ => false
                         };
@@ -104,7 +104,7 @@ pub mod v19 {
                                 submitter: file.submitter.clone(),
                                 size: file.size,
                                 acknowledged_by_owner: file.acknowledged,
-                                acknowledged_by_verified_issuer: Self::acknowledged_by_verified_issuer(&loc, &file.submitter),
+                                acknowledged_by_verified_issuer: Self::acknowledged_by_verified_issuer(&loc.owner, &loc.requester, &file.submitter),
                             })
                             .collect();
                         let metadata: Vec<MetadataItem<<T as frame_system::Config>::AccountId, T::EthereumAddress, <T as pallet::Config>::Hash>> = loc.metadata
@@ -114,7 +114,7 @@ pub mod v19 {
                                 value: item.value,
                                 submitter: item.submitter.clone(),
                                 acknowledged_by_owner: item.acknowledged,
-                                acknowledged_by_verified_issuer: Self::acknowledged_by_verified_issuer(&loc, &item.submitter),
+                                acknowledged_by_verified_issuer: Self::acknowledged_by_verified_issuer(&loc.owner, &loc.requester, &item.submitter),
                             })
                             .collect();
                         Some(LegalOfficerCaseOf::<T> {

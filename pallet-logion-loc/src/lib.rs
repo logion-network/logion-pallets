@@ -271,6 +271,7 @@ pub mod pallet {
     use crate::SupportedAccountId::Polkadot;
     use super::*;
     pub use crate::weights::WeightInfo;
+    pub use crate::migrations::v19::AcknowledgeItemsByIssuer;
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
@@ -589,9 +590,13 @@ pub mod pallet {
                 let loc = entry.1;
                 loc.metadata.iter().for_each(|metadata| {
                     log::info!("LOC {:?} metadata {:?} acknowledged_by_owner {:?} acknowledged_by_verified_issuer {:?}", loc_id, metadata.name, metadata.acknowledged_by_owner, metadata.acknowledged_by_verified_issuer);
+                    let acknowledged_by_verified_issuer = AcknowledgeItemsByIssuer::<T>::acknowledged_by_verified_issuer(&loc.owner, &loc.requester, &metadata.submitter);
+                    assert_eq!(metadata.acknowledged_by_verified_issuer, acknowledged_by_verified_issuer);
                 });
                 loc.files.iter().for_each(|file| {
                     log::info!("LOC {:?} file {:?} acknowledged_by_owner {:?} acknowledged_by_verified_issuer {:?}", loc_id, file.hash, file.acknowledged_by_owner, file.acknowledged_by_verified_issuer);
+                    let acknowledged_by_verified_issuer = AcknowledgeItemsByIssuer::<T>::acknowledged_by_verified_issuer(&loc.owner, &loc.requester, &file.submitter);
+                    assert_eq!(file.acknowledged_by_verified_issuer, acknowledged_by_verified_issuer);
                 });
             });
 
