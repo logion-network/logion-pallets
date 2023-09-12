@@ -8,5 +8,7 @@ members = [
     "pallet-logion-vote",
     "pallet-verified-recovery"
 ]
+resolver = "2"
+
 [profile.release]
 panic = "unwind"

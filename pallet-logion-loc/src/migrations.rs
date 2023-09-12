@@ -7,41 +7,16 @@ use frame_support::traits::OnRuntimeUpgrade;
 use crate::{Config, PalletStorageVersion, pallet::StorageVersion};
 use super::*;
 
-pub mod v19 {
+pub mod v20 {
     use super::*;
     use crate::*;
 
     #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
-    pub struct MetadataItemV18<AccountId, EthereumAddress, Hash> {
-        name: Hash,
-        value: Hash,
-        submitter: SupportedAccountId<AccountId, EthereumAddress>,
-        acknowledged: bool,
-    }
-
-    type MetadataItemV18Of<T> = MetadataItemV18<
-        <T as frame_system::Config>::AccountId,
-        <T as pallet::Config>::EthereumAddress,
-        <T as pallet::Config>::Hash,
-    >;
-
-    #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
-    struct FileV18<Hash, AccountId, EthereumAddress> {
-        hash: Hash,
-        nature: Hash,
-        submitter: SupportedAccountId<AccountId, EthereumAddress>,
-        size: u32,
-        acknowledged: bool,
-    }
-
-    type FileV18Of<T> = FileV18<<T as pallet::Config>::Hash, <T as frame_system::Config>::AccountId, <T as pallet::Config>::EthereumAddress>;
-
-    #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
-    pub struct LegalOfficerCaseV18<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance> {
+    pub struct LegalOfficerCaseV19<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance> {
         owner: AccountId,
         requester: Requester<AccountId, LocId, EthereumAddress>,
-        metadata: Vec<MetadataItemV18<AccountId, EthereumAddress, Hash>>,
-        files: Vec<FileV18<Hash, AccountId, EthereumAddress>>,
+        metadata: Vec<MetadataItem<AccountId, EthereumAddress, Hash>>,
+        files: Vec<File<Hash, AccountId, EthereumAddress>>,
         closed: bool,
         loc_type: LocType,
         links: Vec<LocLink<LocId, Hash>>,
@@ -55,7 +30,7 @@ pub mod v19 {
         value_fee: Balance,
     }
 
-    type LegalOfficerCaseV18Of<T> = LegalOfficerCaseV18<
+    type LegalOfficerCaseV19Of<T> = LegalOfficerCaseV19<
         <T as frame_system::Config>::AccountId,
         <T as pallet::Config>::Hash,
         <T as pallet::Config>::LocId,
@@ -65,63 +40,21 @@ pub mod v19 {
         BalanceOf<T>,
     >;
 
-    pub struct AcknowledgeItemsByIssuer<T>(sp_std::marker::PhantomData<T>);
-
-    impl<T: Config> AcknowledgeItemsByIssuer<T> {
-
-        pub fn acknowledged_by_verified_issuer(owner: &T::AccountId, requester: &RequesterOf<T>, submitter: &SupportedAccountId<T::AccountId, T::EthereumAddress>) -> bool {
-            // Any polkadot submitter different from owner or requester, will be assumed to be verified issuer.
-            match submitter {
-                SupportedAccountId::Polkadot(polkadot_submitter) => {
-                    if *polkadot_submitter == owner.clone() {
-                        false
-                    } else {
-                        let submitted_by_requester = match requester {
-                            Account(polkadot_requester) => polkadot_requester == polkadot_submitter,
-                            _ => false
-                        };
-                        !submitted_by_requester
-                    }
-                },
-                _ => false
-            }
-        }
-    }
-    impl<T: Config> OnRuntimeUpgrade for AcknowledgeItemsByIssuer<T> {
+    pub struct AddCustomLegalFee<T>(sp_std::marker::PhantomData<T>);
+    impl<T: Config> OnRuntimeUpgrade for AddCustomLegalFee<T> {
 
         fn on_runtime_upgrade() -> Weight {
             super::do_storage_upgrade::<T, _>(
-                StorageVersion::V18AddValueFee,
                 StorageVersion::V19AcknowledgeItemsByIssuer,
-                "AcknowledgeItemsByIssuer",
+                StorageVersion::V20AddCustomLegalFee,
+                "AddCustomLegalFee",
                 || {
-                    LocMap::<T>::translate_values(|loc: LegalOfficerCaseV18Of<T>| {
-                        let files: Vec<File<<T as pallet::Config>::Hash, <T as frame_system::Config>::AccountId, T::EthereumAddress>> = loc.files
-                            .iter()
-                            .map(|file: &FileV18Of<T>| File {
-                                hash: file.hash,
-                                nature: file.nature,
-                                submitter: file.submitter.clone(),
-                                size: file.size,
-                                acknowledged_by_owner: file.acknowledged,
-                                acknowledged_by_verified_issuer: Self::acknowledged_by_verified_issuer(&loc.owner, &loc.requester, &file.submitter),
-                            })
-                            .collect();
-                        let metadata: Vec<MetadataItem<<T as frame_system::Config>::AccountId, T::EthereumAddress, <T as pallet::Config>::Hash>> = loc.metadata
-                            .iter()
-                            .map(|item: &MetadataItemV18Of<T>| MetadataItem {
-                                name: item.name,
-                                value: item.value,
-                                submitter: item.submitter.clone(),
-                                acknowledged_by_owner: item.acknowledged,
-                                acknowledged_by_verified_issuer: Self::acknowledged_by_verified_issuer(&loc.owner, &loc.requester, &item.submitter),
-                            })
-                            .collect();
+                    LocMap::<T>::translate_values(|loc: LegalOfficerCaseV19Of<T>| {
                         Some(LegalOfficerCaseOf::<T> {
                             owner: loc.owner,
                             requester: loc.requester,
-                            metadata,
-                            files,
+                            metadata: loc.metadata,
+                            files: loc.files,
                             closed: loc.closed,
                             loc_type: loc.loc_type,
                             links: loc.links,
@@ -133,6 +66,7 @@ pub mod v19 {
                             seal: loc.seal,
                             sponsorship_id: loc.sponsorship_id,
                             value_fee: loc.value_fee,
+                            legal_fee: None,
                         })
                     })
                 }

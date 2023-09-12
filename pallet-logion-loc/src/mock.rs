@@ -178,7 +178,7 @@ parameter_types! {
 
 pub struct LegalFeeImpl;
 impl LegalFee<NegativeImbalanceOf<Test>, Balance, LocType, AccountId> for LegalFeeImpl {
-    fn get_legal_fee(loc_type: LocType) -> EuroCent {
+    fn get_default_legal_fee(loc_type: LocType) -> EuroCent {
         match loc_type {
             LocType::Identity => 8_00, // 8.00 euros
             _ => 100_00, // 100.00 euros

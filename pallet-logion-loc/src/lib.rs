@@ -141,6 +141,7 @@ pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress
     seal: Option<Hash>,
     sponsorship_id: Option<SponsorshipId>,
     value_fee: Balance,
+    legal_fee: Option<Balance>,
 }
 
 pub type LegalOfficerCaseOf<T> = LegalOfficerCase<
@@ -266,12 +267,11 @@ pub mod pallet {
     use frame_support::traits::Currency;
     use logion_shared::{
         LocQuery, LocValidity, IsLegalOfficer, RewardDistributor,
-        DistributionKey, LegalFee, EuroCent, Beneficiary,
+        DistributionKey, LegalFee, Beneficiary,
     };
     use crate::SupportedAccountId::Polkadot;
     use super::*;
     pub use crate::weights::WeightInfo;
-    pub use crate::migrations::v19::AcknowledgeItemsByIssuer;
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
@@ -586,18 +586,7 @@ pub mod pallet {
             assert_eq!(PalletStorageVersion::<T>::get(), StorageVersion::default());
 
             LocMap::<T>::iter().for_each(|entry| {
-                let loc_id = entry.0;
-                let loc = entry.1;
-                loc.metadata.iter().for_each(|metadata| {
-                    log::info!("LOC {:?} metadata {:?} acknowledged_by_owner {:?} acknowledged_by_verified_issuer {:?}", loc_id, metadata.name, metadata.acknowledged_by_owner, metadata.acknowledged_by_verified_issuer);
-                    let acknowledged_by_verified_issuer = AcknowledgeItemsByIssuer::<T>::acknowledged_by_verified_issuer(&loc.owner, &loc.requester, &metadata.submitter);
-                    assert_eq!(metadata.acknowledged_by_verified_issuer, acknowledged_by_verified_issuer);
-                });
-                loc.files.iter().for_each(|file| {
-                    log::info!("LOC {:?} file {:?} acknowledged_by_owner {:?} acknowledged_by_verified_issuer {:?}", loc_id, file.hash, file.acknowledged_by_owner, file.acknowledged_by_verified_issuer);
-                    let acknowledged_by_verified_issuer = AcknowledgeItemsByIssuer::<T>::acknowledged_by_verified_issuer(&loc.owner, &loc.requester, &file.submitter);
-                    assert_eq!(file.acknowledged_by_verified_issuer, acknowledged_by_verified_issuer);
-                });
+                assert!(entry.1.legal_fee.is_none());
             });
 
             Ok(())
@@ -625,11 +614,12 @@ pub mod pallet {
         V17HashItemRecordPublicData,
         V18AddValueFee,
         V19AcknowledgeItemsByIssuer,
+        V20AddCustomLegalFee,
     }
 
     impl Default for StorageVersion {
         fn default() -> StorageVersion {
-            return StorageVersion::V19AcknowledgeItemsByIssuer;
+            return StorageVersion::V20AddCustomLegalFee;
         }
     }
 
@@ -648,6 +638,7 @@ pub mod pallet {
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
             legal_officer: T::AccountId,
+            legal_fee: Option<BalanceOf<T>>,
         ) -> DispatchResultWithPostInfo {
             let requester_account_id = ensure_signed(origin)?;
 
@@ -657,7 +648,7 @@ pub mod pallet {
                 Err(Error::<T>::AlreadyExists)?
             } else {
                 let requester = RequesterOf::<T>::Account(requester_account_id.clone());
-                let loc = Self::build_open_loc(&legal_officer, &requester, LocType::Identity, None);
+                let loc = Self::build_open_loc(&legal_officer, &requester, LocType::Identity, None, legal_fee);
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
@@ -682,7 +673,7 @@ pub mod pallet {
                 Err(Error::<T>::AlreadyExists)?
             } else {
                 let requester = RequesterOf::<T>::None;
-                let loc = Self::build_open_loc(&who, &requester, LocType::Identity, None);
+                let loc = Self::build_open_loc(&who, &requester, LocType::Identity, None, None);
                 <LocMap<T>>::insert(loc_id, loc);
 
                 Self::deposit_event(Event::LocCreated(loc_id));
@@ -697,6 +688,7 @@ pub mod pallet {
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
             legal_officer: T::AccountId,
+            legal_fee: Option<BalanceOf<T>>,
         ) -> DispatchResultWithPostInfo {
             let requester_account_id = ensure_signed(origin)?;
 
@@ -706,7 +698,7 @@ pub mod pallet {
                 Err(Error::<T>::AlreadyExists)?
             } else {
                 let requester = RequesterOf::<T>::Account(requester_account_id.clone());
-                let loc = Self::build_open_loc(&legal_officer, &requester, LocType::Transaction, None);
+                let loc = Self::build_open_loc(&legal_officer, &requester, LocType::Transaction, None, legal_fee);
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
@@ -739,7 +731,7 @@ pub mod pallet {
                             Err(Error::<T>::UnexpectedRequester)?
                         } else {
                             let requester = RequesterOf::<T>::Loc(requester_loc_id.clone());
-                            let new_loc = Self::build_open_loc(&who, &requester, LocType::Transaction, None);
+                            let new_loc = Self::build_open_loc(&who, &requester, LocType::Transaction, None, None);
                             <LocMap<T>>::insert(loc_id, new_loc);
                             Self::link_with_identity_loc(&requester_loc_id, &loc_id);
                         },
@@ -761,6 +753,7 @@ pub mod pallet {
             collection_max_size: Option<u32>,
             collection_can_upload: bool,
             value_fee: BalanceOf<T>,
+            legal_fee: Option<BalanceOf<T>>,
         ) -> DispatchResultWithPostInfo {
             let requester_account_id = ensure_signed(origin)?;
 
@@ -781,6 +774,7 @@ pub mod pallet {
                     collection_max_size,
                     collection_can_upload,
                     value_fee,
+                    legal_fee,
                 );
 
                 Self::apply_legal_fee(&loc)?;
@@ -1161,7 +1155,7 @@ pub mod pallet {
                 Err(Error::<T>::CannotLinkToSponsorship)?
             } else {
                 let requester = RequesterOf::<T>::OtherAccount(requester_account_id.clone());
-                let loc = Self::build_open_loc(&who, &requester, LocType::Identity, Some(sponsorship_id));
+                let loc = Self::build_open_loc(&who, &requester, LocType::Identity, Some(sponsorship_id), None);
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
@@ -1526,6 +1520,7 @@ pub mod pallet {
             requester: &RequesterOf<T>,
             loc_type: LocType,
             sponsorship_id: Option<T::SponsorshipId>,
+            legal_fee: Option<BalanceOf<T>>,
         ) -> LegalOfficerCaseOf<T> {
             LegalOfficerCaseOf::<T> {
                 owner: legal_officer.clone(),
@@ -1543,6 +1538,7 @@ pub mod pallet {
                 seal: None,
                 sponsorship_id: sponsorship_id.clone(),
                 value_fee: 0u32.into(),
+                legal_fee: legal_fee.clone(),
             }
         }
 
@@ -1553,6 +1549,7 @@ pub mod pallet {
             collection_max_size: Option<CollectionSize>,
             collection_can_upload: bool,
             value_fee: BalanceOf<T>,
+            legal_fee: Option<BalanceOf<T>>,
         ) -> LegalOfficerCaseOf<T> {
             LegalOfficerCaseOf::<T> {
                 owner: who.clone(),
@@ -1570,6 +1567,7 @@ pub mod pallet {
                 seal: None,
                 sponsorship_id: None,
                 value_fee,
+                legal_fee,
             }
         }
 
@@ -1834,7 +1832,7 @@ pub mod pallet {
                 }
             };
             if fee_payer.is_some() {
-                let fee = Self::calculate_legal_fee(loc.loc_type);
+                let fee = Self::calculate_legal_fee(loc);
                 ensure!(T::Currency::can_slash(&fee_payer.as_ref().unwrap(), fee), Error::<T>::InsufficientFunds);
                 let (credit, _) = T::Currency::slash(&fee_payer.as_ref().unwrap(), fee);
                 let beneficiary = T::LegalFee::distribute(credit, loc.loc_type, loc.owner.clone());
@@ -1843,9 +1841,16 @@ pub mod pallet {
             Ok(())
         }
 
-        pub fn calculate_legal_fee(loc_type: LocType) -> BalanceOf<T> {
-            let fee_in_euro_cent: EuroCent = T::LegalFee::get_legal_fee(loc_type);
-            let exchange_rate: BalanceOf<T> = T::ExchangeRate::get();
+        fn calculate_legal_fee(loc: &LegalOfficerCaseOf<T>) -> BalanceOf<T> {
+            match loc.legal_fee {
+                None => Self::calculate_default_legal_fee(loc.loc_type),
+                Some(legal_fee) => legal_fee,
+            }
+        }
+
+        pub fn calculate_default_legal_fee(loc_type: LocType) -> BalanceOf<T> {
+            let fee_in_euro_cent = T::LegalFee::get_default_legal_fee(loc_type);
+            let exchange_rate = T::ExchangeRate::get();
             exchange_rate.saturating_mul(fee_in_euro_cent.into())
         }
 
