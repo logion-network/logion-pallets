@@ -30,7 +30,7 @@ pub mod pallet {
         type LocId: Member + Parameter + Default + Copy + HasCompact;
 
         /// Implementation of recovery config creation
-        type CreateRecoveryCallFactory: CreateRecoveryCallFactory<Self::RuntimeOrigin, Self::AccountId, Self::BlockNumber>;
+        type CreateRecoveryCallFactory: CreateRecoveryCallFactory<Self::RuntimeOrigin, Self::AccountId, BlockNumberFor<Self>>;
 
         /// Query for checking the existence of a closed Identity LOC
         type LocQuery: LocQuery<Self::LocId, Self::AccountId>;
@@ -89,7 +89,7 @@ pub mod pallet {
             let call = <T as Config>::CreateRecoveryCallFactory::build_create_recovery_call(
                     legal_officers,
                     1,
-                    <T as frame_system::Config>::BlockNumber::from(0u32)
+                    0u32.into(),
             );
             call.dispatch_bypass_filter(origin)
         }

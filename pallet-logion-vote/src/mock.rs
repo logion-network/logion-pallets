@@ -4,22 +4,17 @@ use frame_support::parameter_types;
 use frame_support::traits::EnsureOrigin;
 use sp_core::hash::H256;
 use sp_runtime::{
-    traits::{BlakeTwo256, IdentityLookup}, testing::Header,
+    traits::{BlakeTwo256, IdentityLookup}, generic, testing::Header, BuildStorage,
 };
 use frame_system::{self as system, Config};
 use logion_shared::{IsLegalOfficer, LegalOfficerCaseSummary, LegalOfficerCreation, LocQuery, LocValidity};
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
-type Block = frame_system::mocking::MockBlock<Test>;
 
 frame_support::construct_runtime!(
-    pub enum Test where
-        Block = Block,
-        NodeBlock = Block,
-        UncheckedExtrinsic = UncheckedExtrinsic,
-    {
-        System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
-        LogionVote: pallet_logion_vote::{Pallet, Call, Storage, Event<T>},
+    pub enum Test {
+        System: frame_system,
+        LogionVote: pallet_logion_vote,
     }
 );
 
@@ -89,19 +84,18 @@ parameter_types! {
 }
 
 impl system::Config for Test {
+    type Block = generic::Block<Header, UncheckedExtrinsic>;
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
     type BlockLength = ();
     type DbWeight = ();
     type RuntimeOrigin = RuntimeOrigin;
+    type Nonce = u64;
     type RuntimeCall = RuntimeCall;
-    type Index = u64;
-    type BlockNumber = u64;
     type Hash = H256;
     type Hashing = BlakeTwo256;
     type AccountId = u64;
     type Lookup = IdentityLookup<Self::AccountId>;
-    type Header = Header;
     type RuntimeEvent = RuntimeEvent;
     type BlockHashCount = BlockHashCount;
     type Version = ();
@@ -127,7 +121,7 @@ impl pallet_logion_vote::Config for Test {
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-    let t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
+    let t = system::GenesisConfig::<Test>::default().build_storage().unwrap();
     let mut ext = sp_io::TestExternalities::new(t);
     ext.execute_with(|| System::set_block_number(1));
     ext

@@ -6,25 +6,21 @@ use frame_support::{
 
 use sp_core::H256;
 use sp_runtime::{
+    generic,
     testing::Header,
-    traits::{BlakeTwo256, IdentityLookup}, Percent,
+    traits::{BlakeTwo256, IdentityLookup},
+    Percent,
+    BuildStorage,
 };
 use logion_shared::{DistributionKey, RewardDistributor};
 
 pub type AccountId = u64;
-pub type BlockNumber = u64;
 pub type Balance = u128;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
-type Block = frame_system::mocking::MockBlock<Test>;
 
 construct_runtime!(
-    pub struct Test
-    where
-        Block = Block,
-        NodeBlock = Block,
-        UncheckedExtrinsic = UncheckedExtrinsic,
-    {
+    pub struct Test {
         System: frame_system,
         Balances: pallet_balances,
         BlockReward: pallet_block_reward,
@@ -36,18 +32,17 @@ parameter_types! {
 }
 
 impl frame_system::Config for Test {
+    type Block = generic::Block<Header, UncheckedExtrinsic>;
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
     type BlockLength = ();
     type RuntimeOrigin = RuntimeOrigin;
-    type Index = u64;
+    type Nonce = u64;
     type RuntimeCall = RuntimeCall;
-    type BlockNumber = BlockNumber;
     type Hash = H256;
     type Hashing = BlakeTwo256;
     type AccountId = AccountId;
     type Lookup = IdentityLookup<Self::AccountId>;
-    type Header = Header;
     type RuntimeEvent = RuntimeEvent;
     type BlockHashCount = BlockHashCount;
     type DbWeight = ();
@@ -79,10 +74,10 @@ impl pallet_balances::Config for Test {
     type DustRemoval = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
-    type HoldIdentifier = [u8; 8];
     type FreezeIdentifier = [u8; 8];
     type MaxFreezes = MaxFreezes;
     type MaxHolds = MaxHolds;
+    type RuntimeHoldReason = [u8; 8];
     type WeightInfo = ();
 }
 
@@ -134,7 +129,7 @@ impl pallet_block_reward::Config for Test {
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {
-    let t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+    let t = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();
     let mut ext = sp_io::TestExternalities::new(t);
     ext.execute_with(|| System::set_block_number(1));
     ext

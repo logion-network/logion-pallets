@@ -3,12 +3,11 @@ use logion_shared::{Beneficiary, DistributionKey, EuroCent, IsLegalOfficer, Lega
 use sp_core::hash::H256;
 use frame_support::{construct_runtime, parameter_types, traits::{EnsureOrigin, Currency}};
 use sp_io::hashing::sha2_256;
-use sp_runtime::{traits::{BlakeTwo256, IdentityLookup}, testing::Header, Percent};
+use sp_runtime::{traits::{BlakeTwo256, IdentityLookup}, testing::Header, Percent, generic, BuildStorage};
 use frame_system as system;
 use sp_core::H160;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
-type Block = frame_system::mocking::MockBlock<Test>;
 
 pub type AccountId = u64;
 pub type Balance = u128;
@@ -18,14 +17,10 @@ pub type SponsorshipId = u32;
 pub type Hash = H256;
 
 construct_runtime!(
-    pub struct Test where
-        Block = Block,
-        NodeBlock = Block,
-        UncheckedExtrinsic = UncheckedExtrinsic,
-    {
-        System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+    pub struct Test {
+        System: frame_system,
         Balances: pallet_balances,
-        LogionLoc: pallet_loc::{Pallet, Call, Storage, Event<T>},
+        LogionLoc: pallet_loc,
     }
 );
 
@@ -35,19 +30,18 @@ parameter_types! {
 }
 
 impl system::Config for Test {
+    type Block = generic::Block<Header, UncheckedExtrinsic>;
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
     type BlockLength = ();
     type DbWeight = ();
     type RuntimeOrigin = RuntimeOrigin;
+    type Nonce = u64;
     type RuntimeCall = RuntimeCall;
-    type Index = u64;
-    type BlockNumber = u64;
     type Hash = Hash;
     type Hashing = BlakeTwo256;
     type AccountId = AccountId;
     type Lookup = IdentityLookup<Self::AccountId>;
-    type Header = Header;
     type RuntimeEvent = RuntimeEvent;
     type BlockHashCount = BlockHashCount;
     type Version = ();
@@ -78,10 +72,10 @@ impl pallet_balances::Config for Test {
     type DustRemoval = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
-    type HoldIdentifier = [u8; 8];
     type FreezeIdentifier = [u8; 8];
     type MaxFreezes = MaxFreezes;
 	type MaxHolds = MaxHolds;
+    type RuntimeHoldReason = [u8; 8];
     type WeightInfo = ();
 }
 
@@ -242,7 +236,7 @@ pub fn new_test_ext() -> sp_io::TestExternalities {
 }
 
 pub fn new_test_ext_at_block(block_number: u64) -> sp_io::TestExternalities {
-    let t = system::GenesisConfig::default().build_storage::<Test>().unwrap();
+    let t = system::GenesisConfig::<Test>::default().build_storage().unwrap();
     let mut ext = sp_io::TestExternalities::new(t);
     ext.execute_with(|| System::set_block_number(block_number));
     ext

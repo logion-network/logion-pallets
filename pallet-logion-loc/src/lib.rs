@@ -27,6 +27,7 @@ use scale_info::TypeInfo;
 use logion_shared::LegalOfficerCaseSummary;
 use crate::Requester::Account;
 use frame_support::sp_runtime::Saturating;
+use frame_system::pallet_prelude::BlockNumberFor;
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
 pub enum LocType {
@@ -148,7 +149,7 @@ pub type LegalOfficerCaseOf<T> = LegalOfficerCase<
     <T as frame_system::Config>::AccountId,
     <T as pallet::Config>::Hash,
     <T as pallet::Config>::LocId,
-    <T as frame_system::Config>::BlockNumber,
+    BlockNumberFor<T>,
     <T as pallet::Config>::EthereumAddress,
     <T as pallet::Config>::SponsorshipId,
     BalanceOf<T>,
@@ -582,13 +583,7 @@ pub mod pallet {
 
         #[cfg(feature = "try-runtime")]
         fn post_upgrade(_state: Vec<u8>) -> Result<(), sp_runtime::DispatchError> {
-
             assert_eq!(PalletStorageVersion::<T>::get(), StorageVersion::default());
-
-            LocMap::<T>::iter().for_each(|entry| {
-                assert!(entry.1.legal_fee.is_none());
-            });
-
             Ok(())
         }
     }
@@ -749,7 +744,7 @@ pub mod pallet {
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
             legal_officer: T::AccountId,
-            collection_last_block_submission: Option<T::BlockNumber>,
+            collection_last_block_submission: Option<BlockNumberFor<T>>,
             collection_max_size: Option<u32>,
             collection_can_upload: bool,
             value_fee: BalanceOf<T>,
@@ -1545,7 +1540,7 @@ pub mod pallet {
         fn build_open_collection_loc(
             who: &T::AccountId,
             requester: &RequesterOf<T>,
-            collection_last_block_submission: Option<T::BlockNumber>,
+            collection_last_block_submission: Option<BlockNumberFor<T>>,
             collection_max_size: Option<CollectionSize>,
             collection_can_upload: bool,
             value_fee: BalanceOf<T>,
