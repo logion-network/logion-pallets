@@ -2,22 +2,18 @@ use crate::{self as pallet_lo_authority_list, HostData, HostDataOf};
 use sp_core::hash::H256;
 use frame_support::{parameter_types, codec::{Encode, Decode}};
 use sp_runtime::{
-    traits::{BlakeTwo256, IdentityLookup}, testing::Header,
+    traits::{BlakeTwo256, IdentityLookup}, testing::Header, generic,
+    BuildStorage,
 };
 use frame_system::{self as system, EnsureRoot};
 use scale_info::TypeInfo;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
-type Block = frame_system::mocking::MockBlock<Test>;
 
 frame_support::construct_runtime!(
-    pub enum Test where
-        Block = Block,
-        NodeBlock = Block,
-        UncheckedExtrinsic = UncheckedExtrinsic,
-    {
-        System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
-        LoAuthorityList: pallet_lo_authority_list::{Pallet, Call, Storage, Event<T>},
+    pub enum Test {
+        System: frame_system,
+        LoAuthorityList: pallet_lo_authority_list,
     }
 );
 
@@ -27,19 +23,18 @@ parameter_types! {
 }
 
 impl system::Config for Test {
+    type Block = generic::Block<Header, UncheckedExtrinsic>;
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
     type BlockLength = ();
     type DbWeight = ();
     type RuntimeOrigin = RuntimeOrigin;
+    type Nonce = u64;
     type RuntimeCall = RuntimeCall;
-    type Index = u64;
-    type BlockNumber = u64;
     type Hash = H256;
     type Hashing = BlakeTwo256;
     type AccountId = u64;
     type Lookup = IdentityLookup<Self::AccountId>;
-    type Header = Header;
     type RuntimeEvent = RuntimeEvent;
     type BlockHashCount = BlockHashCount;
     type Version = ();
@@ -100,5 +95,5 @@ impl pallet_lo_authority_list::Config for Test {
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-    system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
+    system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
 }

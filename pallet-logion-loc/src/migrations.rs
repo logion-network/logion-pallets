@@ -3,6 +3,7 @@ use frame_support::traits::Get;
 use frame_support::dispatch::Vec;
 use frame_support::weights::Weight;
 use frame_support::traits::OnRuntimeUpgrade;
+use frame_system::pallet_prelude::BlockNumberFor;
 
 use crate::{Config, PalletStorageVersion, pallet::StorageVersion};
 use super::*;
@@ -34,7 +35,7 @@ pub mod v20 {
         <T as frame_system::Config>::AccountId,
         <T as pallet::Config>::Hash,
         <T as pallet::Config>::LocId,
-        <T as frame_system::Config>::BlockNumber,
+        BlockNumberFor<T>,
         <T as pallet::Config>::EthereumAddress,
         <T as pallet::Config>::SponsorshipId,
         BalanceOf<T>,

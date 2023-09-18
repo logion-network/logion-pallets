@@ -33,10 +33,10 @@ pub mod pallet {
             + From<frame_system::Call<Self>>;
 
         /// Implementation of multisig "approve as multi"
-        type MultisigApproveAsMultiCallFactory: MultisigApproveAsMultiCallFactory<Self::RuntimeOrigin, Self::AccountId, Timepoint<Self::BlockNumber>>;
+        type MultisigApproveAsMultiCallFactory: MultisigApproveAsMultiCallFactory<Self::RuntimeOrigin, Self::AccountId, Timepoint<BlockNumberFor<Self>>>;
 
         /// Implementation of multisig "as multi"
-        type MultisigAsMultiCallFactory: MultisigAsMultiCallFactory<Self::RuntimeOrigin, Self::AccountId, Timepoint<Self::BlockNumber>>;
+        type MultisigAsMultiCallFactory: MultisigAsMultiCallFactory<Self::RuntimeOrigin, Self::AccountId, Timepoint<BlockNumberFor<Self>>>;
 
         /// Query for checking that a signer is a legal officer
         type IsLegalOfficer: IsLegalOfficer<Self::AccountId, Self::RuntimeOrigin>;
@@ -115,8 +115,8 @@ pub mod pallet {
         pub fn approve_call(
             origin: OriginFor<T>,
             other_signatories: Vec<T::AccountId>,
-            call: Box<<<T as pallet::Config>::MultisigAsMultiCallFactory as MultisigAsMultiCallFactory<T::RuntimeOrigin, T::AccountId, Timepoint<T::BlockNumber>>>::Call>,
-            timepoint: Timepoint<T::BlockNumber>,
+            call: Box<<<T as pallet::Config>::MultisigAsMultiCallFactory as MultisigAsMultiCallFactory<T::RuntimeOrigin, T::AccountId, Timepoint<BlockNumberFor<T>>>>::Call>,
+            timepoint: Timepoint<BlockNumberFor<T>>,
             max_weight: Weight,
         ) -> DispatchResultWithPostInfo {
             if other_signatories.len() != 2 {
@@ -147,8 +147,8 @@ pub mod pallet {
         fn dispatch_as_multi(
             origin: OriginFor<T>,
             other_signatories: Vec<T::AccountId>,
-            call: Box<<<T as pallet::Config>::MultisigAsMultiCallFactory as MultisigAsMultiCallFactory<T::RuntimeOrigin, T::AccountId, Timepoint<T::BlockNumber>>>::Call>,
-            timepoint: Timepoint<T::BlockNumber>,
+            call: Box<<<T as pallet::Config>::MultisigAsMultiCallFactory as MultisigAsMultiCallFactory<T::RuntimeOrigin, T::AccountId, Timepoint<BlockNumberFor<T>>>>::Call>,
+            timepoint: Timepoint<BlockNumberFor<T>>,
             max_weight: Weight,
         ) -> DispatchResultWithPostInfo {
             let call = <T as Config>::MultisigAsMultiCallFactory::build_as_multi_call(

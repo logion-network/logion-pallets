@@ -6,11 +6,16 @@ use sp_std::fmt::Debug;
 use frame_support::codec::{Decode, Encode};
 use frame_support::dispatch::{DispatchResultWithPostInfo, Vec};
 use frame_support::error::BadOrigin;
-use frame_support::traits::EnsureOrigin;
+use frame_support::{
+    sp_runtime,
+    traits::EnsureOrigin,
+};
 use logion_shared::{IsLegalOfficer, LegalOfficerCreation};
-use scale_info::TypeInfo;
+use scale_info::{TypeInfo, prelude::string::String};
 use sp_core::OpaquePeerId as PeerId;
 use sp_std::collections::btree_set::BTreeSet;
+
+use serde::{Deserialize, Serialize};
 
 pub use pallet::*;
 
@@ -25,11 +30,9 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 use frame_system::RawOrigin;
 
-#[cfg(feature = "std")]
 pub trait GenesisRegion<Region>: Into<Region> {}
 
-#[cfg(feature = "std")]
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, serde::Serialize, serde::Deserialize)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, TypeInfo, Serialize, Deserialize)]
 pub struct GenesisHostData {
     pub node_id: Option<PeerId>,
     pub base_url: Option<Vec<u8>>,
@@ -128,13 +131,11 @@ pub mod pallet {
     #[pallet::getter(fn pallet_storage_version)]
     pub type PalletStorageVersion<T> = StorageValue<_, StorageVersion, ValueQuery>;
 
-    #[cfg(feature = "std")]
     #[pallet::genesis_config]
     pub struct GenesisConfig<T: Config> {
         pub legal_officers: Vec<(T::AccountId, GenesisHostData)>,
     }
 
-    #[cfg(feature = "std")]
     impl<T: Config> Default for GenesisConfig<T> {
         fn default() -> Self {
             Self { legal_officers: Vec::new() }
@@ -142,8 +143,8 @@ pub mod pallet {
     }
 
     #[pallet::genesis_build]
-    impl<T: Config> GenesisBuild<T> for GenesisConfig<T>
-    where <T::Region as FromStr>::Err: std::fmt::Debug
+    impl<T: Config> BuildGenesisConfig for GenesisConfig<T>
+    where <T::Region as FromStr>::Err: Debug
     {
         fn build(&self) {
             let legal_officers: Vec<(T::AccountId, HostData<T::Region>)> = self.legal_officers.iter().map(|data| {
