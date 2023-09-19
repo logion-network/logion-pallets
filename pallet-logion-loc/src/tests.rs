@@ -7,12 +7,12 @@ use sp_runtime::traits::Hash;
 
 use logion_shared::{Beneficiary, LocQuery, LocValidity};
 
-use crate::TokensRecordFileOf;
+use crate::LocLink;
 use crate::{
-    Error, File, LegalOfficerCase, LocLink, LocType, MetadataItem, CollectionItem, CollectionItemFile,
+    Error, File, LegalOfficerCase, LocType, MetadataItem, CollectionItem, CollectionItemFile,
     CollectionItemToken, mock::*, TermsAndConditionsElement, TokensRecordFile,
     VerifiedIssuer, OtherAccountId, SupportedAccountId, MetadataItemParams, FileParams, Hasher,
-    Requester::{Account, OtherAccount}, fees::*, Config,
+    Requester::{Account, OtherAccount}, fees::*, Config, TokensRecordFileOf, LocLinkParams,
 };
 
 const LOC_ID: u32 = 0;
@@ -638,18 +638,38 @@ fn it_fails_adding_file_when_closed() {
 }
 
 #[test]
-fn it_adds_link() {
+fn it_adds_link_with_owner() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
         assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
-        let link = LocLink {
+        let link = LocLinkParams {
             id: OTHER_LOC_ID,
             nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
         };
         assert_ok!(LogionLoc::add_link(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, link.clone()));
         let loc = LogionLoc::loc(LOC_ID).unwrap();
-        assert_eq!(loc.links[0], link);
+        assert_eq!(loc.links[0].id, link.id);
+        assert_eq!(loc.links[0].nature, link.nature);
+        assert_eq!(loc.links[0].submitter, link.submitter);
+        assert_eq!(loc.links[0].acknowledged_by_owner, true);
+        assert_eq!(loc.links[0].acknowledged_by_verified_issuer, false);
+    });
+}
+
+#[test]
+fn it_adds_link_with_requester() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
+        let link = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_ok!(LogionLoc::add_link(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, link.clone()));
     });
 }
 
@@ -659,11 +679,12 @@ fn it_fails_adding_link_for_unauthorized_caller() {
         setup_default_balances();
         assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
         assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
-        let link = LocLink {
+        let link = LocLinkParams {
             id: OTHER_LOC_ID,
             nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(UNAUTHORIZED_CALLER),
         };
-        assert_err!(LogionLoc::add_link(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, link.clone()), Error::<Test>::Unauthorized);
+        assert_err!(LogionLoc::add_link(RuntimeOrigin::signed(UNAUTHORIZED_CALLER), LOC_ID, link.clone()), Error::<Test>::Unauthorized);
     });
 }
 
@@ -673,9 +694,10 @@ fn it_fails_adding_link_when_closed() {
         setup_default_balances();
         create_closed_loc();
         assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
-        let link = LocLink {
+        let link = LocLinkParams {
             id: OTHER_LOC_ID,
             nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
         };
         assert_err!(LogionLoc::add_link(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, link.clone()), Error::<Test>::CannotMutate);
     });
@@ -686,11 +708,120 @@ fn it_fails_adding_wrong_link() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
-        let link = LocLink {
+        let link = LocLinkParams {
             id: OTHER_LOC_ID,
             nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
         };
         assert_err!(LogionLoc::add_link(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, link.clone()), Error::<Test>::LinkedLocNotFound);
+    });
+}
+
+#[test]
+fn it_acknowledges_link() {
+    new_test_ext().execute_with(|| {
+        let link = create_loc_with_link_from_requester();
+        assert_ok!(LogionLoc::acknowledge_link(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, link.id.clone()));
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.links[0], expected_link(&link, ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+
+fn expected_link(link: &LocLinkParams<LocId, crate::mock::Hash, AccountId, EthereumAddress>, acknowledged_by_owner: bool, acknowledged_by_verified_issuer: bool) -> LocLink<LocId, crate::mock::Hash, AccountId, EthereumAddress> {
+    return LocLink {
+        id: link.id,
+        nature: link.nature.clone(),
+        submitter: link.submitter,
+        acknowledged_by_owner,
+        acknowledged_by_verified_issuer,
+    }
+}
+
+fn create_loc_with_link_from_requester() -> LocLinkParams<LocId, crate::mock::Hash, AccountId, EthereumAddress> {
+    setup_default_balances();
+    assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+    assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
+    let link = LocLinkParams {
+        id: OTHER_LOC_ID,
+        nature: sha256(&"test-file-nature".as_bytes().to_vec()),
+        submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+    };
+    assert_ok!(LogionLoc::add_link(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, link.clone()));
+    let loc = LogionLoc::loc(LOC_ID).unwrap();
+    assert_eq!(loc.links[0], expected_link(&link, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    link
+}
+
+#[test]
+fn it_acknowledges_link_as_verified_issuer() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        create_collection_and_nominated_issuer();
+        assert_ok!(LogionLoc::set_issuer_selection(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, ISSUER_ID1, true));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
+        let link = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-file-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(ISSUER_ID1),
+        };
+        assert_ok!(LogionLoc::add_link(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, link.clone()));
+
+        assert_ok!(LogionLoc::acknowledge_link(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, link.id.clone()));
+
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.links[0], expected_link(&link, NOT_ACKNOWLEDGED, ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_to_acknowledge_requester_link_as_issuer() {
+    new_test_ext().execute_with(|| {
+        let link = create_loc_with_link_from_requester();
+        assert_err!(LogionLoc::acknowledge_link(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, link.id.clone()), Error::<Test>::Unauthorized);
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.links[0], expected_link(&link, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+#[test]
+fn it_fails_to_acknowledge_unknown_link() {
+    new_test_ext().execute_with(|| {
+        create_loc_with_link_from_requester();
+        let id = 42;
+        assert_err!(LogionLoc::acknowledge_link(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, id), Error::<Test>::ItemNotFound);
+    });
+}
+
+#[test]
+fn it_fails_to_acknowledge_already_acknowledged_link() {
+    new_test_ext().execute_with(|| {
+        let link = create_loc_with_link_from_requester();
+        assert_ok!(LogionLoc::acknowledge_link(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, link.id.clone()));
+        assert_err!(LogionLoc::acknowledge_link(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, link.id.clone()), Error::<Test>::ItemAlreadyAcknowledged);
+    });
+}
+
+#[test]
+fn it_fails_to_acknowledge_link_when_unauthorized_caller() {
+    new_test_ext().execute_with(|| {
+        let link = create_loc_with_link_from_requester();
+        assert_err!(LogionLoc::acknowledge_link(RuntimeOrigin::signed(UNAUTHORIZED_CALLER), LOC_ID, link.id.clone()), Error::<Test>::Unauthorized);
+    });
+}
+
+#[test]
+fn it_fails_to_close_loc_with_unacknowledged_link() {
+    new_test_ext().execute_with(|| {
+        create_loc_with_link_from_requester();
+        assert_err!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID), Error::<Test>::CannotCloseUnacknowledged);
+    });
+}
+
+#[test]
+fn it_fails_to_acknowledge_link_when_loc_voided() {
+    new_test_ext().execute_with(|| {
+        let link = create_loc_with_link_from_requester();
+        assert_ok!(LogionLoc::make_void(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
+        assert_err!(LogionLoc::acknowledge_link(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, link.id.clone()), Error::<Test>::CannotMutateVoid);
     });
 }
 
@@ -1405,14 +1536,16 @@ fn it_fails_adding_link_with_same_target() {
         setup_default_balances();
         assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
         assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
-        let link1 = LocLink {
+        let link1 = LocLinkParams {
             id: OTHER_LOC_ID,
             nature: sha256(&"test-link1-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
         };
         assert_ok!(LogionLoc::add_link(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, link1.clone()));
-        let link2 = LocLink {
+        let link2 = LocLinkParams {
             id: OTHER_LOC_ID,
             nature: sha256(&"test-link2-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
         };
         assert_err!(LogionLoc::add_link(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, link2.clone()), Error::<Test>::DuplicateLocLink);
     });

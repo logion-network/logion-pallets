@@ -15,6 +15,7 @@ pub type TokenIssuance = u64;
 pub type EthereumAddress = H160;
 pub type SponsorshipId = u32;
 pub type Hash = H256;
+pub type LocId = u32;
 
 construct_runtime!(
     pub struct Test {
@@ -200,7 +201,7 @@ impl Hasher<H256> for SHA256 {
 }
 
 impl pallet_loc::Config for Test {
-    type LocId = u32;
+    type LocId = LocId;
     type RuntimeEvent = RuntimeEvent;
     type Hash = H256;
     type Hasher = SHA256;

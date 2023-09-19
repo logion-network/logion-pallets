@@ -8,19 +8,25 @@ use frame_system::pallet_prelude::BlockNumberFor;
 use crate::{Config, PalletStorageVersion, pallet::StorageVersion};
 use super::*;
 
-pub mod v20 {
+pub mod v21 {
     use super::*;
     use crate::*;
 
     #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
-    pub struct LegalOfficerCaseV19<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance> {
+    pub struct LocLinkV20<LocId, Hash> {
+        id: LocId,
+        nature: Hash,
+    }
+
+    #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+    pub struct LegalOfficerCaseV20<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance> {
         owner: AccountId,
         requester: Requester<AccountId, LocId, EthereumAddress>,
         metadata: Vec<MetadataItem<AccountId, EthereumAddress, Hash>>,
         files: Vec<File<Hash, AccountId, EthereumAddress>>,
         closed: bool,
         loc_type: LocType,
-        links: Vec<LocLink<LocId, Hash>>,
+        links: Vec<LocLinkV20<LocId, Hash>>,
         void_info: Option<LocVoidInfo<LocId>>,
         replacer_of: Option<LocId>,
         collection_last_block_submission: Option<BlockNumber>,
@@ -29,9 +35,10 @@ pub mod v20 {
         seal: Option<Hash>,
         sponsorship_id: Option<SponsorshipId>,
         value_fee: Balance,
+        legal_fee: Option<Balance>,
     }
 
-    type LegalOfficerCaseV19Of<T> = LegalOfficerCaseV19<
+    type LegalOfficerCaseV20Of<T> = LegalOfficerCaseV20<
         <T as frame_system::Config>::AccountId,
         <T as pallet::Config>::Hash,
         <T as pallet::Config>::LocId,
@@ -41,16 +48,25 @@ pub mod v20 {
         BalanceOf<T>,
     >;
 
-    pub struct AddCustomLegalFee<T>(sp_std::marker::PhantomData<T>);
-    impl<T: Config> OnRuntimeUpgrade for AddCustomLegalFee<T> {
+    pub struct EnableRequesterLinks<T>(sp_std::marker::PhantomData<T>);
+    impl<T: Config> OnRuntimeUpgrade for EnableRequesterLinks<T> {
 
         fn on_runtime_upgrade() -> Weight {
             super::do_storage_upgrade::<T, _>(
-                StorageVersion::V19AcknowledgeItemsByIssuer,
                 StorageVersion::V20AddCustomLegalFee,
-                "AddCustomLegalFee",
+                StorageVersion::V21EnableRequesterLinks,
+                "EnableRequesterLinks",
                 || {
-                    LocMap::<T>::translate_values(|loc: LegalOfficerCaseV19Of<T>| {
+                    LocMap::<T>::translate_values(|loc: LegalOfficerCaseV20Of<T>| {
+                        let links = loc.links.iter().map(|link| {
+                            LocLink {
+                                id: link.id,
+                                nature: link.nature,
+                                submitter: SupportedAccountId::Polkadot(loc.owner.clone()),
+                                acknowledged_by_owner: true,
+                                acknowledged_by_verified_issuer: false,
+                            }
+                        }).collect();
                         Some(LegalOfficerCaseOf::<T> {
                             owner: loc.owner,
                             requester: loc.requester,
@@ -58,7 +74,7 @@ pub mod v20 {
                             files: loc.files,
                             closed: loc.closed,
                             loc_type: loc.loc_type,
-                            links: loc.links,
+                            links,
                             void_info: loc.void_info,
                             replacer_of: loc.replacer_of,
                             collection_last_block_submission: loc.collection_last_block_submission,
@@ -67,7 +83,7 @@ pub mod v20 {
                             seal: loc.seal,
                             sponsorship_id: loc.sponsorship_id,
                             value_fee: loc.value_fee,
-                            legal_fee: None,
+                            legal_fee: loc.legal_fee,
                         })
                     })
                 }
