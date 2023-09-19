@@ -59,9 +59,19 @@ pub struct MetadataItemParams<AccountId, EthereumAddress, Hash> {
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
-pub struct LocLink<LocId, Hash> {
+pub struct LocLink<LocId, Hash, AccountId, EthereumAddress> {
     id: LocId,
     nature: Hash,
+    submitter: SupportedAccountId<AccountId, EthereumAddress>,
+    acknowledged_by_owner: bool,
+    acknowledged_by_verified_issuer: bool,
+}
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+pub struct LocLinkParams<LocId, Hash, AccountId, EthereumAddress> {
+    id: LocId,
+    nature: Hash,
+    submitter: SupportedAccountId<AccountId, EthereumAddress>,
 }
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
@@ -133,7 +143,7 @@ pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress
     files: Vec<File<Hash, AccountId, EthereumAddress>>,
     closed: bool,
     loc_type: LocType,
-    links: Vec<LocLink<LocId, Hash>>,
+    links: Vec<LocLink<LocId, Hash, AccountId, EthereumAddress>>,
     void_info: Option<LocVoidInfo<LocId>>,
     replacer_of: Option<LocId>,
     collection_last_block_submission: Option<BlockNumber>,
@@ -584,6 +594,13 @@ pub mod pallet {
         #[cfg(feature = "try-runtime")]
         fn post_upgrade(_state: Vec<u8>) -> Result<(), sp_runtime::DispatchError> {
             assert_eq!(PalletStorageVersion::<T>::get(), StorageVersion::default());
+            LocMap::<T>::iter_values().for_each(|loc| {
+                loc.links.iter().for_each(|link| {
+                    assert_eq!(link.submitter, SupportedAccountId::Polkadot(loc.owner.clone()));
+                    assert!(link.acknowledged_by_owner);
+                    assert!(!link.acknowledged_by_verified_issuer);
+                });
+            });
             Ok(())
         }
     }
@@ -610,11 +627,12 @@ pub mod pallet {
         V18AddValueFee,
         V19AcknowledgeItemsByIssuer,
         V20AddCustomLegalFee,
+        V21EnableRequesterLinks,
     }
 
     impl Default for StorageVersion {
         fn default() -> StorageVersion {
-            return StorageVersion::V20AddCustomLegalFee;
+            return StorageVersion::V21EnableRequesterLinks;
         }
     }
 
@@ -883,7 +901,12 @@ pub mod pallet {
         pub fn add_link(
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
-            link: LocLink<T::LocId, <T as pallet::Config>::Hash>
+            link: LocLinkParams<
+                T::LocId,
+                <T as pallet::Config>::Hash,
+                T::AccountId,
+                T::EthereumAddress,
+            >,
         ) -> DispatchResultWithPostInfo {
             let who = ensure_signed(origin)?;
 
@@ -891,8 +914,9 @@ pub mod pallet {
                 Err(Error::<T>::NotFound)?
             } else {
                 let loc = <LocMap<T>>::get(&loc_id).unwrap();
-                if loc.owner != who {
-                    Err(Error::<T>::Unauthorized)?
+                let published_by_owner: bool = Self::is_published_by_owner(&loc, &who)?;
+                if !Self::is_valid_submitter(&loc_id, &loc, &SupportedAccountId::Polkadot(who), published_by_owner) {
+                    Err(Error::<T>::CannotSubmit)?
                 } else if loc.closed {
                     Err(Error::<T>::CannotMutate)?
                 } else if loc.void_info.is_some() {
@@ -905,7 +929,13 @@ pub mod pallet {
                     }
                     <LocMap<T>>::mutate(loc_id, |loc| {
                         let mutable_loc = loc.as_mut().unwrap();
-                        mutable_loc.links.push(link);
+                        mutable_loc.links.push(LocLink {
+                            id: link.id,
+                            nature: link.nature,
+                            submitter: link.submitter,
+                            acknowledged_by_owner: published_by_owner,
+                            acknowledged_by_verified_issuer: false,
+                        });
                     });
                     Ok(().into())
                 }
@@ -1330,6 +1360,63 @@ pub mod pallet {
                 }
             }
         }
+
+        /// Acknowledge a link.
+        #[pallet::call_index(23)]
+        #[pallet::weight(T::WeightInfo::acknowledge_link())]
+        pub fn acknowledge_link(
+            origin: OriginFor<T>,
+            #[pallet::compact] loc_id: T::LocId,
+            #[pallet::compact] target: T::LocId,
+        ) -> DispatchResultWithPostInfo {
+            let who = ensure_signed(origin)?;
+
+            if !<LocMap<T>>::contains_key(&loc_id) {
+                Err(Error::<T>::NotFound)?
+            } else {
+                let loc = <LocMap<T>>::get(&loc_id).unwrap();
+                let ack_by_owner = loc.owner == who;
+                let ack_by_verified_issuer = Self::selected_verified_issuers(loc_id, &who).is_some();
+                if !ack_by_owner && !ack_by_verified_issuer {
+                    Err(Error::<T>::Unauthorized)?
+                } else if loc.closed {
+                    Err(Error::<T>::CannotMutate)?
+                } else if loc.void_info.is_some() {
+                    Err(Error::<T>::CannotMutateVoid)?
+                }
+                let option_item_index = loc.links.iter().position(|item| item.id == target);
+                if option_item_index.is_none() {
+                    Err(Error::<T>::ItemNotFound)?
+                } else {
+                    let item_index = option_item_index.unwrap();
+                    if ack_by_owner && loc.links[item_index].acknowledged_by_owner {
+                        Err(Error::<T>::ItemAlreadyAcknowledged)?
+                    }
+                    if ack_by_verified_issuer {
+                        if loc.links[item_index].acknowledged_by_verified_issuer {
+                            Err(Error::<T>::ItemAlreadyAcknowledged)?
+                        }
+                        match &loc.links[item_index].submitter {
+                            Polkadot(polkadot_submitter) => {
+                                if *polkadot_submitter != who {
+                                    Err(Error::<T>::Unauthorized)?
+                                }
+                            },
+                            _ => Err(Error::<T>::Unauthorized)?
+                        }
+                    }
+                    <LocMap<T>>::mutate(loc_id, |loc| {
+                        let mutable_loc = loc.as_mut().unwrap();
+                        if ack_by_owner {
+                            mutable_loc.links[item_index].acknowledged_by_owner = true;
+                        } else {
+                            mutable_loc.links[item_index].acknowledged_by_verified_issuer = true;
+                        }
+                    });
+                    Ok(().into())
+                }
+            }
+        }
     }
 
     impl<T: Config> LocQuery<T::LocId, <T as frame_system::Config>::AccountId> for Pallet<T> {
@@ -1633,14 +1720,9 @@ pub mod pallet {
         }
 
         fn has_unacknowledged_items(loc: &LegalOfficerCaseOf<T>) -> bool {
-            let unacknowledged_files = loc.files.iter()
-                .find(|file| { !file.acknowledged_by_owner }).is_some();
-            if unacknowledged_files {
-                true
-            } else {
-                loc.metadata.iter()
-                    .find(|item| { !item.acknowledged_by_owner }).is_some()
-            }
+            loc.files.iter().find(|file| { !file.acknowledged_by_owner }).is_some()
+                || loc.metadata.iter().find(|item| { !item.acknowledged_by_owner }).is_some()
+                || loc.links.iter().find(|link| { !link.acknowledged_by_owner }).is_some()
         }
 
         fn do_add_collection_item(
