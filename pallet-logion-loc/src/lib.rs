@@ -267,8 +267,8 @@ where
 
     pub fn ensure_can_add_metadata<T: pallet::Config>(&self, metadata: &Vec<MetadataItemParams<AccountId, EthereumAddress, Hash>>) -> Result<(), sp_runtime::DispatchError> {
         let mut keys = BTreeSet::new();
-        metadata.iter().find(|item| keys.insert(item.name));
-        self.metadata.iter().find(|item| keys.insert(item.name));
+        metadata.iter().for_each(|item| { keys.insert(item.name); });
+        self.metadata.iter().for_each(|item| { keys.insert(item.name); });
 
         if keys.len() < self.metadata.len() + metadata.len() {
             Err(Error::<T>::DuplicateLocMetadata)?
@@ -278,8 +278,8 @@ where
 
     pub fn ensure_can_add_files<T: pallet::Config>(&self, files: &Vec<FileParams<Hash, AccountId, EthereumAddress>>) -> Result<(), sp_runtime::DispatchError> {
         let mut keys = BTreeSet::new();
-        files.iter().find(|item| keys.insert(item.hash));
-        self.files.iter().find(|item| keys.insert(item.hash));
+        files.iter().for_each(|item| { keys.insert(item.hash); });
+        self.files.iter().for_each(|item| { keys.insert(item.hash); });
 
         if keys.len() < self.files.len() + files.len() {
             Err(Error::<T>::DuplicateLocFile)?
@@ -289,8 +289,8 @@ where
 
     pub fn ensure_can_add_links<T: pallet::Config>(&self, links: &Vec<LocLinkParams<LocId, Hash, AccountId, EthereumAddress>>) -> Result<(), sp_runtime::DispatchError> {
         let mut keys = BTreeSet::new();
-        links.iter().find(|item| keys.insert(item.id));
-        self.links.iter().find(|item| keys.insert(item.id));
+        links.iter().for_each(|item| { keys.insert(item.id); });
+        self.links.iter().for_each(|item| { keys.insert(item.id); });
 
         if keys.len() < self.links.len() + links.len() {
             Err(Error::<T>::DuplicateLocLink)?
