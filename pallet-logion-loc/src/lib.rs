@@ -21,13 +21,15 @@ use frame_support::{
     BoundedVec,
     codec::{Decode, Encode},
     dispatch::Vec,
+    pallet_prelude::Weight,
+    sp_runtime::Saturating,
+    traits::{Currency, ReservableCurrency}
 };
-use frame_support::traits::{Currency, ReservableCurrency};
 use scale_info::TypeInfo;
 use logion_shared::LegalOfficerCaseSummary;
 use crate::Requester::Account;
-use frame_support::sp_runtime::Saturating;
 use frame_system::pallet_prelude::BlockNumberFor;
+use sp_std::collections::btree_set::BTreeSet;
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
 pub enum LocType {
@@ -92,6 +94,70 @@ pub struct FileParams<Hash, AccountId, EthereumAddress> {
     size: u32,
 }
 
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+pub struct ItemsParams<LocId, AccountId, EthereumAddress, Hash> {
+    metadata: Vec<MetadataItemParams<AccountId, EthereumAddress, Hash>>,
+    files: Vec<FileParams<Hash, AccountId, EthereumAddress>>,
+    links: Vec<LocLinkParams<LocId, Hash, AccountId, EthereumAddress>>,
+}
+
+impl<LocId, AccountId, EthereumAddress, Hash> ItemsParams<LocId, AccountId, EthereumAddress, Hash> {
+
+    pub fn weight<T: pallet::Config>(&self) -> Weight {
+        let metadata_weight = self.metadata.iter()
+            .map(|_item| T::WeightInfo::add_metadata())
+            .fold(Weight::zero(), |total: Weight, weight: Weight| total.saturating_add(weight));
+        let files_weight = self.files.iter()
+            .map(|_item| T::WeightInfo::add_file())
+            .fold(Weight::zero(), |total: Weight, weight: Weight| total.saturating_add(weight));
+        let links_weight = self.links.iter()
+            .map(|_item| T::WeightInfo::add_link())
+            .fold(Weight::zero(), |total: Weight, weight: Weight| total.saturating_add(weight));
+        metadata_weight
+            .saturating_add(files_weight)
+            .saturating_add(links_weight)
+    }
+
+    pub fn empty() -> ItemsParams<LocId, AccountId, EthereumAddress, Hash> {
+        ItemsParams {
+            metadata: Vec::new(),
+            files: Vec::new(),
+            links: Vec::new(),
+        }
+    }
+
+    pub fn only_metadata(metadata: Vec<MetadataItemParams<AccountId, EthereumAddress, Hash>>) -> ItemsParams<LocId, AccountId, EthereumAddress, Hash> {
+        ItemsParams {
+            metadata,
+            files: Vec::new(),
+            links: Vec::new(),
+        }
+    }
+
+    pub fn only_files(files: Vec<FileParams<Hash, AccountId, EthereumAddress>>) -> ItemsParams<LocId, AccountId, EthereumAddress, Hash> {
+        ItemsParams {
+            metadata: Vec::new(),
+            files,
+            links: Vec::new(),
+        }
+    }
+
+    pub fn only_links(links: Vec<LocLinkParams<LocId, Hash, AccountId, EthereumAddress>>) -> ItemsParams<LocId, AccountId, EthereumAddress, Hash> {
+        ItemsParams {
+            metadata: Vec::new(),
+            files: Vec::new(),
+            links,
+        }
+    }
+}
+
+pub type ItemsParamsOf<T> = ItemsParams<
+    <T as pallet::Config>::LocId,
+    <T as frame_system::Config>::AccountId,
+    <T as pallet::Config>::EthereumAddress,
+    <T as pallet::Config>::Hash,
+>;
+
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct LocVoidInfo<LocId> {
     replacer: Option<LocId>,
@@ -153,6 +219,125 @@ pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress
     sponsorship_id: Option<SponsorshipId>,
     value_fee: Balance,
     legal_fee: Option<Balance>,
+}
+
+impl<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance>
+LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance>
+where
+    AccountId: PartialEq + Clone,
+    Hash: PartialEq + Copy + Ord,
+    LocId: PartialEq + Copy + Ord,
+    EthereumAddress: PartialEq + Clone,
+{
+
+    pub fn ensure_can_add<T: pallet::Config>(&self, items: &ItemsParams<LocId, AccountId, EthereumAddress, Hash>) -> Result<(), sp_runtime::DispatchError> {
+        self.ensure_requester_submits::<T>(&items)?;
+        self.ensure_can_add_metadata::<T>(&items.metadata)?;
+        self.ensure_can_add_files::<T>(&items.files)?;
+        self.ensure_can_add_links::<T>(&items.links)?;
+        Ok(())
+    }
+
+    pub fn ensure_requester_submits<T: pallet::Config>(&self, items: &ItemsParams<LocId, AccountId, EthereumAddress, Hash>) -> Result<(), sp_runtime::DispatchError> {
+        if items.metadata.iter().find(|item| !self.is_requester(&item.submitter)).is_some()
+            || items.files.iter().find(|item| !self.is_requester(&item.submitter)).is_some()
+            || items.links.iter().find(|item| !self.is_requester(&item.submitter)).is_some() {
+            Err(Error::<T>::CannotSubmit)?
+        }
+        Ok(())
+    }
+
+    pub fn is_requester(&self, submitter: &SupportedAccountId<AccountId, EthereumAddress>) -> bool {
+        match &self.requester {
+            Requester::Account(account_id) => match submitter {
+                SupportedAccountId::Polkadot(polkadot_address) => *account_id == *polkadot_address,
+                _ => false,
+            },
+            Requester::OtherAccount(other) => match other {
+                OtherAccountId::Ethereum(ethereum_account) => match submitter {
+                    SupportedAccountId::Other(other_account) => match other_account {
+                        OtherAccountId::Ethereum(ethereum_address) => *ethereum_account == *ethereum_address,
+                    }
+                    _ => false,
+                },
+            },
+            _ => false,
+        }
+    }
+
+    pub fn ensure_can_add_metadata<T: pallet::Config>(&self, metadata: &Vec<MetadataItemParams<AccountId, EthereumAddress, Hash>>) -> Result<(), sp_runtime::DispatchError> {
+        let mut keys = BTreeSet::new();
+        metadata.iter().find(|item| keys.insert(item.name));
+        self.metadata.iter().find(|item| keys.insert(item.name));
+
+        if keys.len() < self.metadata.len() + metadata.len() {
+            Err(Error::<T>::DuplicateLocMetadata)?
+        }
+        Ok(())
+    }
+
+    pub fn ensure_can_add_files<T: pallet::Config>(&self, files: &Vec<FileParams<Hash, AccountId, EthereumAddress>>) -> Result<(), sp_runtime::DispatchError> {
+        let mut keys = BTreeSet::new();
+        files.iter().find(|item| keys.insert(item.hash));
+        self.files.iter().find(|item| keys.insert(item.hash));
+
+        if keys.len() < self.files.len() + files.len() {
+            Err(Error::<T>::DuplicateLocFile)?
+        }
+        Ok(())
+    }
+
+    pub fn ensure_can_add_links<T: pallet::Config>(&self, links: &Vec<LocLinkParams<LocId, Hash, AccountId, EthereumAddress>>) -> Result<(), sp_runtime::DispatchError> {
+        let mut keys = BTreeSet::new();
+        links.iter().find(|item| keys.insert(item.id));
+        self.links.iter().find(|item| keys.insert(item.id));
+
+        if keys.len() < self.links.len() + links.len() {
+            Err(Error::<T>::DuplicateLocLink)?
+        }
+        Ok(())
+    }
+
+    pub fn add_items(&mut self, origin: &AccountId, items: &ItemsParams<LocId, AccountId, EthereumAddress, Hash>) -> () {
+        items.metadata.iter().for_each(|item| self.add_metadata(origin, item));
+        items.files.iter().for_each(|item| self.add_file(origin, item));
+        items.links.iter().for_each(|item| self.add_link(origin, item));
+    }
+
+    pub fn add_metadata(&mut self, origin: &AccountId, item: &MetadataItemParams<AccountId, EthereumAddress, Hash>) -> () {
+        self.metadata.push(MetadataItem {
+            name: item.name,
+            value: item.value,
+            submitter: item.submitter.clone(),
+            acknowledged_by_owner: self.is_owner(origin),
+            acknowledged_by_verified_issuer: false,
+        });
+    }
+
+    pub fn is_owner(&self, origin: &AccountId) -> bool {
+        self.owner == *origin
+    }
+
+    pub fn add_file(&mut self, origin: &AccountId, file: &FileParams<Hash, AccountId, EthereumAddress>) -> () {
+        self.files.push(File {
+            hash: file.hash,
+            nature: file.nature,
+            submitter: file.submitter.clone(),
+            size: file.size,
+            acknowledged_by_owner: self.is_owner(origin),
+            acknowledged_by_verified_issuer: false,
+        });
+    }
+
+    pub fn add_link(&mut self, origin: &AccountId, link: &LocLinkParams<LocId, Hash, AccountId, EthereumAddress>) -> () {
+        self.links.push(LocLink {
+            id: link.id,
+            nature: link.nature,
+            submitter: link.submitter.clone(),
+            acknowledged_by_owner: self.is_owner(origin),
+            acknowledged_by_verified_issuer: false,
+        });
+    }
 }
 
 pub type LegalOfficerCaseOf<T> = LegalOfficerCase<
@@ -287,7 +472,7 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// LOC identifier
-        type LocId: Member + Parameter + Default + Copy + HasCompact;
+        type LocId: Member + Parameter + Default + Copy + HasCompact + Ord;
 
         /// Type for hashes stored in LOCs
         type Hash: Member + Parameter + Default + Copy + Ord;
@@ -642,16 +827,17 @@ pub mod pallet {
     pub type PalletStorageVersion<T> = StorageValue<_, StorageVersion, ValueQuery>;
 
     #[pallet::call]
-    impl<T:Config> Pallet<T> {
+    impl<T: Config> Pallet<T> {
 
         /// Creates a new Polkadot Identity LOC i.e. a LOC linking a real identity to an AccountId.
         #[pallet::call_index(0)]
-        #[pallet::weight(T::WeightInfo::create_polkadot_identity_loc())]
+        #[pallet::weight(T::WeightInfo::create_polkadot_identity_loc().saturating_add(items.weight::<T>()))]
         pub fn create_polkadot_identity_loc(
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
             legal_officer: T::AccountId,
             legal_fee: Option<BalanceOf<T>>,
+            items: ItemsParamsOf<T>,
         ) -> DispatchResultWithPostInfo {
             let requester_account_id = ensure_signed(origin)?;
 
@@ -661,7 +847,10 @@ pub mod pallet {
                 Err(Error::<T>::AlreadyExists)?
             } else {
                 let requester = RequesterOf::<T>::Account(requester_account_id.clone());
-                let loc = Self::build_open_loc(&legal_officer, &requester, LocType::Identity, None, legal_fee);
+                let mut loc = Self::build_open_loc(&legal_officer, &requester, LocType::Identity, None, legal_fee);
+                loc.ensure_can_add::<T>(&items)?;
+                Self::ensure_valid_links(&items.links)?;
+                loc.add_items(&requester_account_id, &items);
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
@@ -696,12 +885,13 @@ pub mod pallet {
 
         /// Creates a new Polkadot Transaction LOC i.e. a LOC requested with an AccountId
         #[pallet::call_index(2)]
-        #[pallet::weight(T::WeightInfo::create_polkadot_transaction_loc())]
+        #[pallet::weight(T::WeightInfo::create_polkadot_transaction_loc().saturating_add(items.weight::<T>()))]
         pub fn create_polkadot_transaction_loc(
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
             legal_officer: T::AccountId,
             legal_fee: Option<BalanceOf<T>>,
+            items: ItemsParamsOf<T>,
         ) -> DispatchResultWithPostInfo {
             let requester_account_id = ensure_signed(origin)?;
 
@@ -711,7 +901,10 @@ pub mod pallet {
                 Err(Error::<T>::AlreadyExists)?
             } else {
                 let requester = RequesterOf::<T>::Account(requester_account_id.clone());
-                let loc = Self::build_open_loc(&legal_officer, &requester, LocType::Transaction, None, legal_fee);
+                let mut loc = Self::build_open_loc(&legal_officer, &requester, LocType::Transaction, None, legal_fee);
+                loc.ensure_can_add::<T>(&items)?;
+                Self::ensure_valid_links(&items.links)?;
+                loc.add_items(&requester_account_id, &items);
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
@@ -757,7 +950,7 @@ pub mod pallet {
 
         /// Creates a new Collection LOC
         #[pallet::call_index(4)]
-        #[pallet::weight(T::WeightInfo::create_collection_loc())]
+        #[pallet::weight(T::WeightInfo::create_collection_loc().saturating_add(items.weight::<T>()))]
         pub fn create_collection_loc(
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
@@ -767,6 +960,7 @@ pub mod pallet {
             collection_can_upload: bool,
             value_fee: BalanceOf<T>,
             legal_fee: Option<BalanceOf<T>>,
+            items: ItemsParamsOf<T>,
         ) -> DispatchResultWithPostInfo {
             let requester_account_id = ensure_signed(origin)?;
 
@@ -780,7 +974,7 @@ pub mod pallet {
                 Err(Error::<T>::AlreadyExists)?
             } else {
                 let requester = RequesterOf::<T>::Account(requester_account_id.clone());
-                let loc = Self::build_open_collection_loc(
+                let mut loc = Self::build_open_collection_loc(
                     &legal_officer,
                     &requester,
                     collection_last_block_submission,
@@ -789,6 +983,9 @@ pub mod pallet {
                     value_fee,
                     legal_fee,
                 );
+                loc.ensure_can_add::<T>(&items)?;
+                Self::ensure_valid_links(&items.links)?;
+                loc.add_items(&requester_account_id, &items);
 
                 Self::apply_legal_fee(&loc)?;
                 if value_fee > 0_u32.into() {
@@ -825,18 +1022,10 @@ pub mod pallet {
                 } else if loc.void_info.is_some() {
                     Err(Error::<T>::CannotMutateVoid)?
                 } else {
-                    if loc.metadata.iter().find(|metadata_item| metadata_item.name == item.name).is_some() {
-                        Err(Error::<T>::DuplicateLocMetadata)?
-                    }
+                    loc.ensure_can_add_metadata::<T>(&Vec::from([item.clone()]))?;
                     <LocMap<T>>::mutate(loc_id, |loc| {
                         let mutable_loc = loc.as_mut().unwrap();
-                        mutable_loc.metadata.push(MetadataItem {
-                            name: item.name,
-                            value: item.value,
-                            submitter: item.submitter,
-                            acknowledged_by_owner: published_by_owner,
-                            acknowledged_by_verified_issuer: false,
-                        });
+                        mutable_loc.add_metadata(&who, &item);
                     });
                     Ok(().into())
                 }
@@ -865,9 +1054,7 @@ pub mod pallet {
                 } else if loc.void_info.is_some() {
                     Err(Error::<T>::CannotMutateVoid)?
                 } else {
-                    if loc.files.iter().find(|item| item.hash == file.hash).is_some() {
-                        Err(Error::<T>::DuplicateLocFile)?
-                    }
+                    loc.ensure_can_add_files::<T>(&Vec::from([file.clone()]))?;
                     let fee_payer;
                     if loc.sponsorship_id.is_some() {
                         let sponsorship = <SponsorshipMap<T>>::get(loc.sponsorship_id.unwrap()).unwrap();
@@ -881,14 +1068,7 @@ pub mod pallet {
                     Self::apply_file_storage_fee(&fee_payer, 1, file.size)?;
                     <LocMap<T>>::mutate(loc_id, |loc| {
                         let mutable_loc = loc.as_mut().unwrap();
-                        mutable_loc.files.push(File {
-                            hash: file.hash,
-                            nature: file.nature,
-                            submitter: file.submitter,
-                            size: file.size,
-                            acknowledged_by_owner: published_by_owner,
-                            acknowledged_by_verified_issuer: false,
-                        });
+                        mutable_loc.add_file(&who, &file);
                     });
                     Ok(().into())
                 }
@@ -915,7 +1095,7 @@ pub mod pallet {
             } else {
                 let loc = <LocMap<T>>::get(&loc_id).unwrap();
                 let published_by_owner: bool = Self::is_published_by_owner(&loc, &who)?;
-                if !Self::is_valid_submitter(&loc_id, &loc, &SupportedAccountId::Polkadot(who), published_by_owner) {
+                if !Self::is_valid_submitter(&loc_id, &loc, &SupportedAccountId::Polkadot(who.clone()), published_by_owner) {
                     Err(Error::<T>::CannotSubmit)?
                 } else if loc.closed {
                     Err(Error::<T>::CannotMutate)?
@@ -924,18 +1104,10 @@ pub mod pallet {
                 } else if !<LocMap<T>>::contains_key(&link.id) {
                     Err(Error::<T>::LinkedLocNotFound)?
                 } else {
-                    if loc.links.iter().find(|item| item.id == link.id).is_some() {
-                        Err(Error::<T>::DuplicateLocLink)?
-                    }
+                    loc.ensure_can_add_links::<T>(&Vec::from([link.clone()]))?;
                     <LocMap<T>>::mutate(loc_id, |loc| {
                         let mutable_loc = loc.as_mut().unwrap();
-                        mutable_loc.links.push(LocLink {
-                            id: link.id,
-                            nature: link.nature,
-                            submitter: link.submitter,
-                            acknowledged_by_owner: published_by_owner,
-                            acknowledged_by_verified_issuer: false,
-                        });
+                        mutable_loc.add_link(&who, &link);
                     });
                     Ok(().into())
                 }
@@ -1952,6 +2124,15 @@ pub mod pallet {
                 let sponsorship = maybe_sponsorship.as_mut().unwrap();
                 sponsorship.loc_id = Some(*loc_id);
             });
+        }
+
+        fn ensure_valid_links(links: &Vec<LocLinkParams<T::LocId, <T as pallet::Config>::Hash, T::AccountId, T::EthereumAddress>>) -> Result<(), sp_runtime::DispatchError> {
+            for link in links.iter() {
+                if Self::loc(link.id).is_none() {
+                    Err(Error::<T>::LinkedLocNotFound)?;
+                }
+            }
+            Ok(())
         }
     }
 }

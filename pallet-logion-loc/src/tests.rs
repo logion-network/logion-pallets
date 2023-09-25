@@ -7,7 +7,7 @@ use sp_runtime::traits::Hash;
 
 use logion_shared::{Beneficiary, LocQuery, LocValidity};
 
-use crate::LocLink;
+use crate::{LocLink, ItemsParams};
 use crate::{
     Error, File, LegalOfficerCase, LocType, MetadataItem, CollectionItem, CollectionItemFile,
     CollectionItemToken, mock::*, TermsAndConditionsElement, TokensRecordFile,
@@ -33,7 +33,7 @@ fn it_creates_loc_with_default_legal_fee() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: LOC_OWNER1,
             requester: LOC_REQUESTER,
@@ -78,7 +78,7 @@ fn it_creates_loc_with_custom_legal_fee() {
         setup_default_balances();
         let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
         let custom_legal_fee = 1000 * ONE_LGNT;
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, Some(custom_legal_fee)));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, Some(custom_legal_fee), ItemsParams::empty()));
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: LOC_OWNER1,
             requester: LOC_REQUESTER,
@@ -107,7 +107,7 @@ fn it_creates_loc_with_custom_legal_fee() {
 fn it_makes_existing_loc_void() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::make_void(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let void_info = LogionLoc::loc(LOC_ID).unwrap().void_info;
@@ -123,7 +123,7 @@ fn it_makes_existing_loc_void_and_replace_it() {
         create_closed_loc();
 
         const REPLACER_LOC_ID: u32 = OTHER_LOC_ID;
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), REPLACER_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), REPLACER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
 
         assert_ok!(LogionLoc::make_void_and_replace(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, REPLACER_LOC_ID));
 
@@ -143,7 +143,7 @@ fn it_makes_existing_loc_void_and_replace_it() {
 fn it_fails_making_existing_loc_void_for_unauthorized_caller() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_err!(LogionLoc::make_void(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID), Error::<Test>::Unauthorized);
         let void_info = LogionLoc::loc(LOC_ID).unwrap().void_info;
         assert!(!void_info.is_some());
@@ -154,7 +154,7 @@ fn it_fails_making_existing_loc_void_for_unauthorized_caller() {
 fn it_fails_making_existing_loc_void_for_already_void_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::make_void(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
         assert_err!(LogionLoc::make_void(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID), Error::<Test>::AlreadyVoid);
     });
@@ -164,7 +164,7 @@ fn it_fails_making_existing_loc_void_for_already_void_loc() {
 fn it_fails_replacing_with_non_existent_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_err!(LogionLoc::make_void_and_replace(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, OTHER_LOC_ID), Error::<Test>::ReplacerLocNotFound);
     });
 }
@@ -174,9 +174,9 @@ fn it_fails_replacing_with_void_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         const REPLACER_LOC_ID: u32 = OTHER_LOC_ID;
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::make_void(RuntimeOrigin::signed(LOC_OWNER1), OTHER_LOC_ID));
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_err!(LogionLoc::make_void_and_replace(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, REPLACER_LOC_ID), Error::<Test>::ReplacerLocAlreadyVoid);
     });
 }
@@ -186,9 +186,9 @@ fn it_fails_replacing_with_loc_already_replacing_another_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         const REPLACER_LOC_ID: u32 = 2;
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), REPLACER_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), REPLACER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::make_void_and_replace(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, REPLACER_LOC_ID));
         assert_err!(LogionLoc::make_void_and_replace(RuntimeOrigin::signed(LOC_OWNER1), OTHER_LOC_ID, REPLACER_LOC_ID), Error::<Test>::ReplacerLocAlreadyReplacing);
     });
@@ -199,8 +199,8 @@ fn it_fails_replacing_with_wrongly_typed_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         const REPLACER_LOC_ID: u32 = 2;
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
-        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), REPLACER_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), REPLACER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_err!(LogionLoc::make_void_and_replace(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, REPLACER_LOC_ID), Error::<Test>::ReplacerLocWrongType);
     });
 }
@@ -209,7 +209,7 @@ fn it_fails_replacing_with_wrongly_typed_loc() {
 fn it_adds_metadata_when_caller_and_submitter_is_owner() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let metadata = MetadataItemParams {
             name: sha256(&vec![1, 2, 3]),
             value: sha256(&vec![4, 5, 6]),
@@ -239,7 +239,7 @@ fn expected_metadata(metadata: MetadataItemParams<AccountId, EthereumAddress, cr
 fn it_adds_metadata_when_caller_is_requester_and_submitter_is_requester() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let metadata = MetadataItemParams {
             name: sha256(&vec![1, 2, 3]),
             value: sha256(&vec![4, 5, 6]),
@@ -255,7 +255,7 @@ fn it_adds_metadata_when_caller_is_requester_and_submitter_is_requester() {
 fn it_adds_metadata_when_caller_is_requester() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let metadata = MetadataItemParams {
             name: sha256(&vec![1, 2, 3]),
             value: sha256(&vec![4, 5, 6]),
@@ -352,7 +352,7 @@ fn it_fails_to_acknowledge_metadata_when_loc_voided() {
 
 fn create_loc_with_metadata_from_requester() -> MetadataItemParams<AccountId, EthereumAddress, crate::mock::Hash> {
     setup_default_balances();
-    assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+    assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
     let metadata = MetadataItemParams {
         name: sha256(&vec![1, 2, 3]),
         value: sha256(&vec![4, 5, 6]),
@@ -368,7 +368,7 @@ fn create_loc_with_metadata_from_requester() -> MetadataItemParams<AccountId, Et
 fn it_fails_adding_metadata_for_unauthorized_caller() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let metadata = MetadataItemParams {
             name: sha256(&vec![1, 2, 3]),
             value: sha256(&vec![4, 5, 6]),
@@ -396,7 +396,7 @@ fn it_fails_adding_metadata_when_closed() {
 fn it_fails_adding_metadata_when_invalid_submitter() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let metadata = MetadataItemParams {
             name: sha256(&vec![1, 2, 3]),
             value: sha256(&vec![4, 5, 6]),
@@ -407,7 +407,7 @@ fn it_fails_adding_metadata_when_invalid_submitter() {
 }
 
 fn create_closed_loc() {
-    assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+    assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
     assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 }
 
@@ -415,7 +415,7 @@ fn create_closed_loc() {
 fn it_adds_file_when_caller_owner_and_submitter_is_owner() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let file = FileParams {
             hash: sha256(&"test".as_bytes().to_vec()),
             nature: sha256(&"test-file-nature".as_bytes().to_vec()),
@@ -447,7 +447,7 @@ fn expected_file(file: &FileParams<H256, AccountId, EthereumAddress>, acknowledg
 fn it_adds_file_when_caller_is_requester_and_submitter_is_requester() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let file = FileParams {
             hash: sha256(&"test".as_bytes().to_vec()),
             nature: sha256(&"test-file-nature".as_bytes().to_vec()),
@@ -467,7 +467,7 @@ fn it_adds_file_when_caller_is_requester_and_submitter_is_requester() {
 fn it_adds_file_when_caller_is_requester() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let file = FileParams {
             hash: sha256(&"test".as_bytes().to_vec()),
             nature: sha256(&"test-file-nature".as_bytes().to_vec()),
@@ -568,7 +568,7 @@ fn it_fails_to_acknowledge_file_when_loc_voided() {
 
 fn create_loc_with_file_from_requester() -> FileParams<H256, AccountId, EthereumAddress> {
     setup_default_balances();
-    assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+    assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
     let file = FileParams {
         hash: sha256(&"test".as_bytes().to_vec()),
         nature: sha256(&"test-file-nature".as_bytes().to_vec()),
@@ -585,7 +585,7 @@ fn create_loc_with_file_from_requester() -> FileParams<H256, AccountId, Ethereum
 fn it_fails_adding_file_for_unauthorized_caller() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let file = FileParams {
             hash: sha256(&"test".as_bytes().to_vec()),
             nature: sha256(&"test-file-nature".as_bytes().to_vec()),
@@ -600,7 +600,7 @@ fn it_fails_adding_file_for_unauthorized_caller() {
 fn it_fails_adding_file_when_insufficient_funds() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         set_balance(LOC_REQUESTER_ID, INSUFFICIENT_BALANCE);
         let file = FileParams {
             hash: sha256(&"test".as_bytes().to_vec()),
@@ -641,8 +641,8 @@ fn it_fails_adding_file_when_closed() {
 fn it_adds_link_with_owner() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let link = LocLinkParams {
             id: OTHER_LOC_ID,
             nature: sha256(&"test-link-nature".as_bytes().to_vec()),
@@ -662,8 +662,8 @@ fn it_adds_link_with_owner() {
 fn it_adds_link_with_requester() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let link = LocLinkParams {
             id: OTHER_LOC_ID,
             nature: sha256(&"test-link-nature".as_bytes().to_vec()),
@@ -677,8 +677,8 @@ fn it_adds_link_with_requester() {
 fn it_fails_adding_link_for_unauthorized_caller() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let link = LocLinkParams {
             id: OTHER_LOC_ID,
             nature: sha256(&"test-link-nature".as_bytes().to_vec()),
@@ -693,7 +693,7 @@ fn it_fails_adding_link_when_closed() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         create_closed_loc();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let link = LocLinkParams {
             id: OTHER_LOC_ID,
             nature: sha256(&"test-link-nature".as_bytes().to_vec()),
@@ -707,7 +707,7 @@ fn it_fails_adding_link_when_closed() {
 fn it_fails_adding_wrong_link() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let link = LocLinkParams {
             id: OTHER_LOC_ID,
             nature: sha256(&"test-link-nature".as_bytes().to_vec()),
@@ -739,8 +739,8 @@ fn expected_link(link: &LocLinkParams<LocId, crate::mock::Hash, AccountId, Ether
 
 fn create_loc_with_link_from_requester() -> LocLinkParams<LocId, crate::mock::Hash, AccountId, EthereumAddress> {
     setup_default_balances();
-    assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
-    assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
+    assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
+    assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
     let link = LocLinkParams {
         id: OTHER_LOC_ID,
         nature: sha256(&"test-file-nature".as_bytes().to_vec()),
@@ -758,7 +758,7 @@ fn it_acknowledges_link_as_verified_issuer() {
         setup_default_balances();
         create_collection_and_nominated_issuer();
         assert_ok!(LogionLoc::set_issuer_selection(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, ISSUER_ID1, true));
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let link = LocLinkParams {
             id: OTHER_LOC_ID,
             nature: sha256(&"test-file-nature".as_bytes().to_vec()),
@@ -829,7 +829,7 @@ fn it_fails_to_acknowledge_link_when_loc_voided() {
 fn it_closes_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
         let loc = LogionLoc::loc(LOC_ID).unwrap();
         assert!(loc.closed);
@@ -841,7 +841,7 @@ fn it_closes_loc() {
 fn it_fails_closing_loc_for_unauthorized_caller() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_err!(LogionLoc::close(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID), Error::<Test>::Unauthorized);
     });
 }
@@ -859,8 +859,8 @@ fn it_fails_closing_loc_for_already_closed() {
 fn it_links_locs_to_account() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
-        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert!(LogionLoc::account_locs(LOC_REQUESTER_ID).is_some());
         assert!(LogionLoc::account_locs(LOC_REQUESTER_ID).unwrap().len() == 2);
         assert_eq!(LogionLoc::account_locs(LOC_REQUESTER_ID).unwrap()[0], LOC_ID);
@@ -872,9 +872,9 @@ fn it_links_locs_to_account() {
 fn it_fails_creating_loc_with_non_legal_officer() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_err!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_REQUESTER_ID, None), Error::<Test>::Unauthorized);
-        assert_err!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_REQUESTER_ID, None), Error::<Test>::Unauthorized);
-        assert_err!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_REQUESTER_ID, None, Some(10), false, 0, None), Error::<Test>::Unauthorized);
+        assert_err!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_REQUESTER_ID, None, ItemsParams::empty()), Error::<Test>::Unauthorized);
+        assert_err!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_REQUESTER_ID, None, ItemsParams::empty()), Error::<Test>::Unauthorized);
+        assert_err!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_REQUESTER_ID, None, Some(10), false, 0, None, ItemsParams::empty()), Error::<Test>::Unauthorized);
     });
 }
 
@@ -882,10 +882,10 @@ fn it_fails_creating_loc_with_non_legal_officer() {
 fn it_detects_existing_identity_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
-        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER2, None));
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER2, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER2), OTHER_LOC_ID));
 
         let legal_officers = Vec::from([LOC_OWNER1, LOC_OWNER2]);
@@ -897,7 +897,7 @@ fn it_detects_existing_identity_loc() {
 fn it_detects_valid_loc_with_owner() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
         assert_eq!(LogionLoc::loc_valid_with_owner(&LOC_ID, &LOC_OWNER1), true);
     });
@@ -915,7 +915,7 @@ fn it_detects_non_existing_loc_as_invalid() {
 fn it_detects_open_loc_as_invalid() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_eq!(LogionLoc::loc_valid_with_owner(&LOC_ID, &LOC_OWNER1), false);
     });
 }
@@ -924,7 +924,7 @@ fn it_detects_open_loc_as_invalid() {
 fn it_detects_void_loc_as_invalid() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::make_void(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
         assert_eq!(LogionLoc::loc_valid_with_owner(&LOC_ID, &LOC_OWNER1), false);
     });
@@ -934,7 +934,7 @@ fn it_detects_void_loc_as_invalid() {
 fn it_detects_loc_with_wrong_owner_as_invalid() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
         assert_eq!(LogionLoc::loc_valid_with_owner(&LOC_ID, &LOC_OWNER2), false);
     });
@@ -980,7 +980,7 @@ fn it_creates_and_links_logion_locs_to_identity_loc() {
 fn it_fails_creating_logion_loc_with_polkadot_identity_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
 
         assert_err!(LogionLoc::create_logion_transaction_loc(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, OTHER_LOC_ID), Error::<Test>::UnexpectedRequester);
     });
@@ -990,7 +990,7 @@ fn it_fails_creating_logion_loc_with_polkadot_identity_loc() {
 fn it_fails_creating_logion_loc_with_polkadot_transaction_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
 
         assert_err!(LogionLoc::create_logion_transaction_loc(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, OTHER_LOC_ID), Error::<Test>::UnexpectedRequester);
     });
@@ -1035,7 +1035,7 @@ fn it_creates_collection_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None, ItemsParams::empty()));
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: LOC_OWNER1,
             requester: LOC_REQUESTER,
@@ -1064,7 +1064,7 @@ fn it_creates_collection_loc() {
 fn it_fails_creating_collection_loc_without_limit() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_err!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, None, false, 0, None), Error::<Test>::CollectionHasNoLimit);
+        assert_err!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, None, false, 0, None, ItemsParams::empty()), Error::<Test>::CollectionHasNoLimit);
     });
 }
 
@@ -1072,7 +1072,7 @@ fn it_fails_creating_collection_loc_without_limit() {
 fn it_fails_adding_item_to_open_collection_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None, ItemsParams::empty()));
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
         let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
         assert_err!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, collection_item_id, collection_item_description, vec![], None, false, Vec::new()), Error::<Test>::WrongCollectionLoc);
@@ -1083,7 +1083,7 @@ fn it_fails_adding_item_to_open_collection_loc() {
 fn it_adds_item_to_closed_collection_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1104,7 +1104,7 @@ fn it_adds_item_to_closed_collection_loc() {
 fn it_fails_to_item_with_terms_and_conditions_when_non_existent_tc_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1123,9 +1123,9 @@ fn it_fails_to_item_with_terms_and_conditions_when_non_existent_tc_loc() {
 fn it_fails_to_item_with_terms_and_conditions_when_open_tc_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOGION_CLASSIFICATION_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOGION_CLASSIFICATION_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
         let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
@@ -1143,9 +1143,9 @@ fn it_fails_to_item_with_terms_and_conditions_when_open_tc_loc() {
 fn it_fails_to_item_with_terms_and_conditions_when_void_tc_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOGION_CLASSIFICATION_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOGION_CLASSIFICATION_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::make_void(RuntimeOrigin::signed(LOC_OWNER1), LOGION_CLASSIFICATION_LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1164,11 +1164,11 @@ fn it_fails_to_item_with_terms_and_conditions_when_void_tc_loc() {
 fn it_adds_item_with_terms_and_conditions_to_closed_collection_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOGION_CLASSIFICATION_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOGION_CLASSIFICATION_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOGION_CLASSIFICATION_LOC_ID));
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), ADDITIONAL_TC_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), ADDITIONAL_TC_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), ADDITIONAL_TC_LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1200,7 +1200,7 @@ fn it_adds_item_with_terms_and_conditions_to_closed_collection_loc() {
 fn it_fails_adding_item_to_collection_loc_if_not_requester() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1213,7 +1213,7 @@ fn it_fails_adding_item_to_collection_loc_if_not_requester() {
 fn it_fails_adding_item_if_duplicate_key() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1227,7 +1227,7 @@ fn it_fails_adding_item_if_duplicate_key() {
 fn it_fails_adding_item_if_size_limit_reached() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), false, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), false, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1243,7 +1243,7 @@ fn it_fails_adding_item_if_block_limit_reached() {
     let current_block: u64 = 10;
     new_test_ext_at_block(current_block).execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, Some(current_block - 1), None, false, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, Some(current_block - 1), None, false, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1256,7 +1256,7 @@ fn it_fails_adding_item_if_block_limit_reached() {
 fn it_fails_adding_item_if_collection_void() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), false, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), false, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::make_void(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1269,7 +1269,7 @@ fn it_fails_adding_item_if_collection_void() {
 fn it_fails_adding_item_if_files_attached_but_upload_not_enabled() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), false, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), false, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1288,7 +1288,7 @@ fn it_fails_adding_item_if_files_attached_but_upload_not_enabled() {
 fn it_adds_item_if_no_files_attached_and_upload_enabled() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1301,7 +1301,7 @@ fn it_adds_item_if_no_files_attached_and_upload_enabled() {
 fn it_adds_item_with_one_file_attached() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1323,7 +1323,7 @@ fn it_adds_item_with_one_file_attached() {
 fn it_fails_adding_item_with_insufficient_balance() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
         set_balance(LOC_REQUESTER_ID, INSUFFICIENT_BALANCE);
 
@@ -1345,7 +1345,7 @@ fn it_fails_adding_item_with_insufficient_balance() {
 fn it_adds_item_with_token() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1378,7 +1378,7 @@ fn it_adds_item_with_token() {
 fn it_fails_adding_item_with_missing_token() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1397,7 +1397,7 @@ fn it_fails_adding_item_with_missing_token() {
 fn it_fails_adding_item_with_missing_files() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1416,7 +1416,7 @@ fn it_fails_adding_item_with_missing_files() {
 fn it_adds_item_with_two_files_attached() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1447,7 +1447,7 @@ fn it_adds_item_with_two_files_attached() {
 fn it_fails_to_add_item_with_duplicate_hash() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -1475,7 +1475,7 @@ fn it_fails_to_add_item_with_duplicate_hash() {
 fn it_closes_and_seals_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let seal = BlakeTwo256::hash_of(&"some external private data".as_bytes().to_vec());
         assert_ok!(LogionLoc::close_and_seal(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, seal));
         let loc = LogionLoc::loc(LOC_ID).unwrap();
@@ -1489,7 +1489,7 @@ fn it_closes_and_seals_loc() {
 fn it_fails_adding_file_with_same_hash() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let file1 = FileParams {
             hash: sha256(&"test".as_bytes().to_vec()),
             nature: sha256(&"test-file-nature".as_bytes().to_vec()),
@@ -1514,7 +1514,7 @@ fn it_fails_adding_file_with_same_hash() {
 fn it_fails_adding_metadata_with_same_name() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let metadata1 = MetadataItemParams {
             name: sha256(&"name".as_bytes().to_vec()),
             value: sha256(&"value1".as_bytes().to_vec()),
@@ -1534,8 +1534,8 @@ fn it_fails_adding_metadata_with_same_name() {
 fn it_fails_adding_link_with_same_target() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let link1 = LocLinkParams {
             id: OTHER_LOC_ID,
             nature: sha256(&"test-link1-nature".as_bytes().to_vec()),
@@ -1555,7 +1555,7 @@ fn it_fails_adding_link_with_same_target() {
 fn it_adds_several_metadata() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let metadata1 = MetadataItemParams {
             name: sha256(&vec![1, 2, 3]),
             value: sha256(&vec![4, 5, 6]),
@@ -1597,7 +1597,7 @@ fn it_dismisses_an_issuer() {
 }
 
 fn nominate_issuer(issuer: u64, identity_loc: u32) {
-    assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(issuer), identity_loc, LOC_OWNER1, None));
+    assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(issuer), identity_loc, LOC_OWNER1, None, ItemsParams::empty()));
     assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), identity_loc));
     assert_ok!(LogionLoc::nominate_issuer(RuntimeOrigin::signed(LOC_OWNER1), issuer, identity_loc));
 }
@@ -1616,7 +1616,7 @@ fn it_selects_an_issuer() {
 }
 
 fn create_collection_and_nominated_issuer() {
-    assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, None));
+    assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, None, ItemsParams::empty()));
     nominate_issuer(ISSUER_ID1, ISSUER1_IDENTITY_LOC_ID);
 }
 
@@ -1632,7 +1632,7 @@ fn it_fails_selecting_an_issuer_loc_not_found() {
 fn it_fails_selecting_an_issuer_not_nominated() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, None, ItemsParams::empty()));
 
         assert_err!(LogionLoc::set_issuer_selection(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, ISSUER_ID1, true), Error::<Test>::NotNominated);
     });
@@ -1675,7 +1675,7 @@ fn it_selects_an_issuer_not_collection() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         nominate_issuer(ISSUER_ID1, ISSUER1_IDENTITY_LOC_ID);
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
 
         assert_ok!(LogionLoc::set_issuer_selection(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, ISSUER_ID1, true));
     });
@@ -1890,7 +1890,7 @@ fn it_fails_adding_tokens_record_collection_void() {
 fn it_fails_adding_tokens_record_not_collection() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let record_id = build_record_id();
         let record_description = build_record_description();
         let record_files = build_record_files(1);
@@ -1975,7 +1975,7 @@ fn nominated_and_select_issuer(loc_id: u32) {
 fn it_adds_file_on_polkadot_transaction_loc_when_caller_is_requester_and_submitter_is_issuer() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         nominated_and_select_issuer(LOC_ID);
         let file = FileParams {
             hash: sha256(&"test".as_bytes().to_vec()),
@@ -1997,7 +1997,7 @@ fn it_adds_file_on_polkadot_transaction_loc_when_caller_is_requester_and_submitt
 fn it_fails_adding_file_on_polkadot_transaction_loc_cannot_submit() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let file = FileParams {
             hash: sha256(&"test".as_bytes().to_vec()),
             nature: sha256(&"test-file-nature".as_bytes().to_vec()),
@@ -2026,7 +2026,7 @@ fn it_fails_adding_metadata_on_logion_identity_loc_cannot_submit() {
 fn it_adds_metadata_on_polkadot_transaction_loc_when_submitter_is_issuer() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         nominated_and_select_issuer(LOC_ID);
         let metadata = MetadataItemParams {
             name: sha256(&vec![1, 2, 3]),
@@ -2041,7 +2041,7 @@ fn it_adds_metadata_on_polkadot_transaction_loc_when_submitter_is_issuer() {
 fn it_fails_adding_metadata_on_polkadot_transaction_loc_cannot_submit() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         let metadata = MetadataItemParams {
             name: sha256(&vec![1, 2, 3]),
             value: sha256(&vec![4, 5, 6]),
@@ -2141,7 +2141,7 @@ fn it_creates_polkadot_identity_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
-        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None));
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: LOC_OWNER1,
             requester: Account(LOC_REQUESTER_ID),
@@ -2261,7 +2261,7 @@ fn it_adds_file_when_submitter_is_ethereum_requester() {
 fn it_fails_adding_item_with_token_with_zero_issuance() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(1), true, 0, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
@@ -2287,7 +2287,7 @@ fn it_reserves_value_fees() {
         setup_default_balances();
         let legal_fee = 2000 * ONE_LGNT;
         let value_fee = 100;
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, value_fee, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, value_fee, None, ItemsParams::empty()));
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: LOC_OWNER1,
             requester: LOC_REQUESTER,
@@ -2318,7 +2318,7 @@ fn it_captures_value_fees() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         let value_fee = 100;
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, value_fee, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, value_fee, None, ItemsParams::empty()));
         let previous_balances = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
@@ -2338,7 +2338,7 @@ fn it_frees_value_fees_reserve_on_void() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         let value_fee = 100;
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, value_fee, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, value_fee, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::make_void(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID));
 
         let legal_fee = 2000 * ONE_LGNT;
@@ -2351,8 +2351,8 @@ fn it_does_not_free_value_fees_reserve_on_void_closed() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         let value_fee = 100;
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, value_fee, None));
-        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, Some(10), false, value_fee, None));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, value_fee, None, ItemsParams::empty()));
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, Some(10), false, value_fee, None, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), OTHER_LOC_ID));
         assert_ok!(LogionLoc::make_void(RuntimeOrigin::signed(LOC_OWNER1), OTHER_LOC_ID));
 
@@ -2360,5 +2360,536 @@ fn it_does_not_free_value_fees_reserve_on_void_closed() {
         let expected_free_balance = INITIAL_BALANCE.saturating_sub(2 * legal_fee).saturating_sub(2 * value_fee);
         assert_eq!(<Test as Config>::Currency::free_balance(LOC_REQUESTER_ID), expected_free_balance);
         assert_eq!(<Test as Config>::Currency::reserved_balance(LOC_REQUESTER_ID), value_fee);
+    });
+}
+
+#[test]
+fn it_creates_transaction_loc_with_initial_metadata() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let metadata = MetadataItemParams {
+            name: sha256(&vec![1, 2, 3]),
+            value: sha256(&vec![4, 5, 6]),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_metadata(Vec::from([ metadata.clone() ]))));
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.metadata[0], expected_metadata(metadata, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_creating_transaction_loc_with_duplicate_initial_metadata() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let metadata1 = MetadataItemParams {
+            name: sha256(&"name".as_bytes().to_vec()),
+            value: sha256(&"value1".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        let metadata2 = MetadataItemParams {
+            name: sha256(&"name".as_bytes().to_vec()),
+            value: sha256(&"value2".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_err!(
+            LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_metadata(Vec::from([ metadata1.clone(), metadata2.clone() ]))),
+            Error::<Test>::DuplicateLocMetadata
+        );
+    });
+}
+
+#[test]
+fn it_fails_creating_transaction_loc_with_invalid_metadata_submitter() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let metadata = MetadataItemParams {
+            name: sha256(&vec![1, 2, 3]),
+            value: sha256(&vec![4, 5, 6]),
+            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
+        };
+        assert_err!(
+            LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_metadata(Vec::from([ metadata.clone() ]))),
+            Error::<Test>::CannotSubmit
+        );
+    });
+}
+
+#[test]
+fn it_creates_transaction_loc_with_initial_files() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let file = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+            size: 4,
+        };
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_files(Vec::from([ file.clone() ]))));
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.files[0], expected_file(&file, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_creating_transaction_loc_with_duplicate_initial_files() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let file1 = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test 1".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+            size: 4,
+        };
+        let file2 = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test 2".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+            size: 4,
+        };
+        assert_err!(
+            LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_files(Vec::from([ file1, file2 ]))),
+            Error::<Test>::DuplicateLocFile
+        );
+    });
+}
+
+#[test]
+fn it_fails_creating_transaction_loc_with_invalid_file_submitter() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let file = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
+            size: 4,
+        };
+        assert_err!(
+            LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_files(Vec::from([ file ]))),
+            Error::<Test>::CannotSubmit
+        );
+    });
+}
+
+#[test]
+fn it_creates_transaction_loc_with_initial_links() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
+        let link = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_links(Vec::from([ link.clone() ]))));
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.links[0], expected_link(&link, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_creating_transaction_loc_with_initial_links_if_not_found() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let link = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_err!(
+            LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_links(Vec::from([ link.clone() ]))),
+            Error::<Test>::LinkedLocNotFound
+        );
+    });
+}
+
+#[test]
+fn it_fails_creating_transaction_loc_with_duplicate_initial_links() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let link1 = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link1-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        let link2 = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link2-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_err!(
+            LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_links(Vec::from([ link1, link2 ]))),
+            Error::<Test>::DuplicateLocLink
+        );
+    });
+}
+
+#[test]
+fn it_fails_creating_transaction_loc_with_invalid_link_submitter() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let link = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
+        };
+        assert_err!(
+            LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_links(Vec::from([ link ]))),
+            Error::<Test>::CannotSubmit
+        );
+    });
+}
+
+#[test]
+fn it_creates_identity_loc_with_initial_metadata() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let metadata = MetadataItemParams {
+            name: sha256(&vec![1, 2, 3]),
+            value: sha256(&vec![4, 5, 6]),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_metadata(Vec::from([ metadata.clone() ]))));
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.metadata[0], expected_metadata(metadata, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_creating_identity_loc_with_duplicate_initial_metadata() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let metadata1 = MetadataItemParams {
+            name: sha256(&"name".as_bytes().to_vec()),
+            value: sha256(&"value1".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        let metadata2 = MetadataItemParams {
+            name: sha256(&"name".as_bytes().to_vec()),
+            value: sha256(&"value2".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_err!(
+            LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_metadata(Vec::from([ metadata1.clone(), metadata2.clone() ]))),
+            Error::<Test>::DuplicateLocMetadata
+        );
+    });
+}
+
+#[test]
+fn it_fails_creating_identity_loc_with_invalid_metadata_submitter() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let metadata = MetadataItemParams {
+            name: sha256(&vec![1, 2, 3]),
+            value: sha256(&vec![4, 5, 6]),
+            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
+        };
+        assert_err!(
+            LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_metadata(Vec::from([ metadata.clone() ]))),
+            Error::<Test>::CannotSubmit
+        );
+    });
+}
+
+#[test]
+fn it_creates_identity_loc_with_initial_files() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let file = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+            size: 4,
+        };
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_files(Vec::from([ file.clone() ]))));
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.files[0], expected_file(&file, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_creating_identity_loc_with_duplicate_initial_files() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let file1 = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test 1".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+            size: 4,
+        };
+        let file2 = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test 2".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+            size: 4,
+        };
+        assert_err!(
+            LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_files(Vec::from([ file1, file2 ]))),
+            Error::<Test>::DuplicateLocFile
+        );
+    });
+}
+
+#[test]
+fn it_fails_creating_identity_loc_with_invalid_file_submitter() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let file = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
+            size: 4,
+        };
+        assert_err!(
+            LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_files(Vec::from([ file ]))),
+            Error::<Test>::CannotSubmit
+        );
+    });
+}
+
+#[test]
+fn it_creates_identity_loc_with_initial_links() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
+        let link = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_links(Vec::from([ link.clone() ]))));
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.links[0], expected_link(&link, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_creating_identity_loc_with_initial_links_if_not_found() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let link = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_err!(
+            LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_links(Vec::from([ link.clone() ]))),
+            Error::<Test>::LinkedLocNotFound
+        );
+    });
+}
+
+#[test]
+fn it_fails_creating_identity_loc_with_duplicate_initial_links() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let link1 = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link1-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        let link2 = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link2-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_err!(
+            LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_links(Vec::from([ link1, link2 ]))),
+            Error::<Test>::DuplicateLocLink
+        );
+    });
+}
+
+#[test]
+fn it_fails_creating_identity_loc_with_invalid_link_submitter() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let link = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
+        };
+        assert_err!(
+            LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, ItemsParams::only_links(Vec::from([ link ]))),
+            Error::<Test>::CannotSubmit
+        );
+    });
+}
+
+#[test]
+fn it_creates_collection_loc_with_initial_metadata() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let metadata = MetadataItemParams {
+            name: sha256(&vec![1, 2, 3]),
+            value: sha256(&vec![4, 5, 6]),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, None, ItemsParams::only_metadata(Vec::from([ metadata.clone() ]))));
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.metadata[0], expected_metadata(metadata, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_creating_collection_loc_with_duplicate_initial_metadata() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let metadata1 = MetadataItemParams {
+            name: sha256(&"name".as_bytes().to_vec()),
+            value: sha256(&"value1".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        let metadata2 = MetadataItemParams {
+            name: sha256(&"name".as_bytes().to_vec()),
+            value: sha256(&"value2".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_err!(
+            LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, None, ItemsParams::only_metadata(Vec::from([ metadata1.clone(), metadata2.clone() ]))),
+            Error::<Test>::DuplicateLocMetadata
+        );
+    });
+}
+
+#[test]
+fn it_fails_creating_collection_loc_with_invalid_metadata_submitter() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let metadata = MetadataItemParams {
+            name: sha256(&vec![1, 2, 3]),
+            value: sha256(&vec![4, 5, 6]),
+            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
+        };
+        assert_err!(
+            LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, None, ItemsParams::only_metadata(Vec::from([ metadata.clone() ]))),
+            Error::<Test>::CannotSubmit
+        );
+    });
+}
+
+#[test]
+fn it_creates_collection_loc_with_initial_files() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let file = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+            size: 4,
+        };
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, None, ItemsParams::only_files(Vec::from([ file.clone() ]))));
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.files[0], expected_file(&file, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_creating_collection_loc_with_duplicate_initial_files() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let file1 = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test 1".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+            size: 4,
+        };
+        let file2 = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test 2".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+            size: 4,
+        };
+        assert_err!(
+            LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, None, ItemsParams::only_files(Vec::from([ file1, file2 ]))),
+            Error::<Test>::DuplicateLocFile
+        );
+    });
+}
+
+#[test]
+fn it_fails_creating_collection_loc_with_invalid_file_submitter() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let file = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
+            size: 4,
+        };
+        assert_err!(
+            LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, None, ItemsParams::only_files(Vec::from([ file ]))),
+            Error::<Test>::CannotSubmit
+        );
+    });
+}
+
+#[test]
+fn it_creates_collection_loc_with_initial_links() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), OTHER_LOC_ID, LOC_OWNER1, None, ItemsParams::empty()));
+        let link = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, None, ItemsParams::only_links(Vec::from([ link.clone() ]))));
+        let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert_eq!(loc.links[0], expected_link(&link, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_creating_collection_loc_with_initial_links_if_not_found() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let link = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_err!(
+            LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, None, ItemsParams::only_links(Vec::from([ link.clone() ]))),
+            Error::<Test>::LinkedLocNotFound
+        );
+    });
+}
+
+#[test]
+fn it_fails_creating_collection_loc_with_duplicate_initial_links() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let link1 = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link1-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        let link2 = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link2-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        };
+        assert_err!(
+            LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, None, ItemsParams::only_links(Vec::from([ link1, link2 ]))),
+            Error::<Test>::DuplicateLocLink
+        );
+    });
+}
+
+#[test]
+fn it_fails_creating_collection_loc_with_invalid_link_submitter() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let link = LocLinkParams {
+            id: OTHER_LOC_ID,
+            nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
+        };
+        assert_err!(
+            LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, None, ItemsParams::only_links(Vec::from([ link ]))),
+            Error::<Test>::CannotSubmit
+        );
     });
 }
