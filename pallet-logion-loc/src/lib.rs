@@ -338,6 +338,25 @@ where
             acknowledged_by_verified_issuer: false,
         });
     }
+
+    pub fn has_items_unacknowledged_by_owner(&self) -> bool {
+        self.files.iter().find(|file| { !file.acknowledged_by_owner }).is_some()
+            || self.metadata.iter().find(|item| { !item.acknowledged_by_owner }).is_some()
+            || self.links.iter().find(|link| { !link.acknowledged_by_owner }).is_some()
+    }
+
+    pub fn has_items_unacknowledged_by_verified_issuer(&self) -> bool {
+        self.files.iter().find(|file| { self.is_submitted_by_verified_issuer(&file.submitter) && !file.acknowledged_by_verified_issuer }).is_some()
+            || self.metadata.iter().find(|item| { self.is_submitted_by_verified_issuer(&item.submitter) && !item.acknowledged_by_verified_issuer }).is_some()
+            || self.links.iter().find(|link| { self.is_submitted_by_verified_issuer( &link.submitter) && !link.acknowledged_by_verified_issuer }).is_some()
+    }
+
+    fn is_submitted_by_verified_issuer(&self, submitter: &SupportedAccountId<AccountId, EthereumAddress>) -> bool {
+        match submitter {
+            SupportedAccountId::Polkadot(polkadot_submitter) => !self.is_owner(polkadot_submitter) && !self.is_requester(submitter),
+            _ => false
+        }
+    }
 }
 
 pub type LegalOfficerCaseOf<T> = LegalOfficerCase<
@@ -601,13 +620,13 @@ pub mod pallet {
         TokensRecordOf<T>
     >;
 
-    /// Verified Issuers by guardian
+    /// Verified Issuers by owner
     #[pallet::storage]
     #[pallet::getter(fn verified_issuers)]
     pub type VerifiedIssuersMap<T> = StorageDoubleMap<
         _,
         Blake2_128Concat,
-        <T as frame_system::Config>::AccountId, // guardian
+        <T as frame_system::Config>::AccountId, // owner
         Blake2_128Concat,
         <T as frame_system::Config>::AccountId, // issuer
         VerifiedIssuerOf<T>,
@@ -632,7 +651,7 @@ pub mod pallet {
         _,
         (
             NMapKey<Blake2_128Concat, <T as frame_system::Config>::AccountId>, // issuer
-            NMapKey<Blake2_128Concat, <T as frame_system::Config>::AccountId>, // guardian
+            NMapKey<Blake2_128Concat, <T as frame_system::Config>::AccountId>, // owner
             NMapKey<Blake2_128Concat, <T as Config>::LocId>,
         ),
         ()
@@ -745,9 +764,9 @@ pub mod pallet {
         CannotAddRecord,
         /// Given identity LOC does not exist or is invalid
         InvalidIdentityLoc,
-        /// Issuer has already been nominated by the guardian
+        /// Issuer has already been nominated by the owner
         AlreadyNominated,
-        /// Issuer is not nominated by the guardian
+        /// Issuer is not nominated by the owner
         NotNominated,
         /// The submitter of added item cannot contribute to this LOC
         CannotSubmit,
@@ -761,10 +780,12 @@ pub mod pallet {
         ItemNotFound,
         /// Target Item (Metadata or File) is already acknowledged
         ItemAlreadyAcknowledged,
-        /// There is still at least one Unacknowledged Item (Metadata or File)
-        CannotCloseUnacknowledged,
+        /// There is still at least one Item (Metadata, Link or File) unacknowledged by LOC owner
+        CannotCloseUnacknowledgedByOwner,
         /// Invalid token issuance
         BadTokenIssuance,
+        /// There is still at least one Item (Metadata, Link or File) unacknowledged by verified issuer
+        CannotCloseUnacknowledgedByVerifiedIssuer,
     }
 
     #[pallet::hooks]
@@ -779,13 +800,6 @@ pub mod pallet {
         #[cfg(feature = "try-runtime")]
         fn post_upgrade(_state: Vec<u8>) -> Result<(), sp_runtime::DispatchError> {
             assert_eq!(PalletStorageVersion::<T>::get(), StorageVersion::default());
-            LocMap::<T>::iter_values().for_each(|loc| {
-                loc.links.iter().for_each(|link| {
-                    assert_eq!(link.submitter, SupportedAccountId::Polkadot(loc.owner.clone()));
-                    assert!(link.acknowledged_by_owner);
-                    assert!(!link.acknowledged_by_verified_issuer);
-                });
-            });
             Ok(())
         }
     }
@@ -1114,27 +1128,6 @@ pub mod pallet {
             }
         }
 
-        /// Close LOC.
-        #[pallet::call_index(8)]
-        #[pallet::weight(T::WeightInfo::close())]
-        pub fn close(
-            origin: OriginFor<T>,
-            #[pallet::compact] loc_id: T::LocId,
-        ) -> DispatchResultWithPostInfo {
-            Self::do_close(origin, loc_id, None)
-        }
-
-        /// Close and seal LOC.
-        #[pallet::call_index(9)]
-        #[pallet::weight(T::WeightInfo::close())]
-        pub fn close_and_seal(
-            origin: OriginFor<T>,
-            #[pallet::compact] loc_id: T::LocId,
-            seal: <T as Config>::Hash,
-        ) -> DispatchResultWithPostInfo {
-            Self::do_close(origin, loc_id, Some(seal))
-        }
-
         /// Make a LOC void.
         #[pallet::call_index(10)]
         #[pallet::weight(T::WeightInfo::make_void())]
@@ -1168,22 +1161,6 @@ pub mod pallet {
             item_token: Option<CollectionItemToken<T::TokenIssuance, <T as Config>::Hash>>,
             restricted_delivery: bool,
             terms_and_conditions: Vec<TermsAndConditionsElement<T::LocId, <T as Config>::Hash>>,
-        ) -> DispatchResultWithPostInfo { Self::do_add_collection_item(origin, collection_loc_id, item_id, item_description, item_files, item_token, restricted_delivery, terms_and_conditions) }
-
-        /// Adds an item with terms and conditions to a collection
-        /// 
-        /// DEPRECATED - this extrinsic will be removed in a future release, use add_collection_item instead
-        #[pallet::call_index(13)]
-        #[pallet::weight(T::WeightInfo::add_collection_item())]
-        pub fn add_collection_item_with_terms_and_conditions(
-            origin: OriginFor<T>,
-            #[pallet::compact] collection_loc_id: T::LocId,
-            item_id: T::CollectionItemId,
-            item_description: <T as Config>::Hash,
-            item_files: Vec<CollectionItemFileOf<T>>,
-            item_token: Option<CollectionItemToken<T::TokenIssuance, <T as Config>::Hash>>,
-            restricted_delivery: bool,
-            terms_and_conditions: Vec<TermsAndConditionsElement<<T as pallet::Config>::LocId, <T as Config>::Hash>>,
         ) -> DispatchResultWithPostInfo { Self::do_add_collection_item(origin, collection_loc_id, item_id, item_description, item_files, item_token, restricted_delivery, terms_and_conditions) }
 
         /// Nominate an issuer
@@ -1589,6 +1566,66 @@ pub mod pallet {
                 }
             }
         }
+
+        /// Close LOC.
+        #[pallet::call_index(24)]
+        #[pallet::weight(T::WeightInfo::close())]
+        pub fn close(
+            origin: OriginFor<T>,
+            #[pallet::compact] loc_id: T::LocId,
+            seal: Option<<T as Config>::Hash>,
+            auto_ack: bool,
+        ) -> DispatchResultWithPostInfo {
+            let who = ensure_signed(origin)?;
+
+            if ! <LocMap<T>>::contains_key(&loc_id) {
+                Err(Error::<T>::NotFound)?
+            } else {
+                let loc = <LocMap<T>>::get(&loc_id).unwrap();
+                if loc.owner != who {
+                    Err(Error::<T>::Unauthorized)?
+                } else if loc.void_info.is_some() {
+                    Err(Error::<T>::CannotMutateVoid)?
+                } else if loc.closed {
+                    Err(Error::<T>::AlreadyClosed)?
+                } else if !auto_ack && loc.has_items_unacknowledged_by_owner() {
+                    Err(Error::<T>::CannotCloseUnacknowledgedByVerifiedIssuer)?
+                } else if loc.has_items_unacknowledged_by_verified_issuer() {
+                    Err(Error::<T>::CannotCloseUnacknowledgedByVerifiedIssuer)?
+                } else {
+                    <LocMap<T>>::mutate(loc_id, |loc| {
+                        let mutable_loc = loc.as_mut().unwrap();
+                        if auto_ack {
+                            mutable_loc.metadata.iter_mut()
+                                .filter(|item| !item.acknowledged_by_owner)
+                                .for_each(|item| item.acknowledged_by_owner = true);
+                            mutable_loc.files.iter_mut()
+                                .filter(|item| !item.acknowledged_by_owner)
+                                .for_each(|item| item.acknowledged_by_owner = true);
+                            mutable_loc.links.iter_mut()
+                                .filter(|item| !item.acknowledged_by_owner)
+                                .for_each(|item| item.acknowledged_by_owner = true);
+                        }
+                        mutable_loc.closed = true;
+                        mutable_loc.seal = seal;
+                    });
+
+                    if loc.loc_type == LocType::Collection && loc.value_fee > 0_u32.into() {
+                        match loc.requester {
+                            Account(requester_account) => {
+                                let (credit, _) = T::Currency::slash_reserved(&requester_account, loc.value_fee);
+                                T::RewardDistributor::distribute(credit, T::ValueFeeDistributionKey::get());
+                                Self::deposit_event(Event::ValueFeeWithdrawn(requester_account, loc.value_fee));
+                            },
+                            _ => {},
+                        }
+                    }
+
+                    Self::deposit_event(Event::LocClosed(loc_id));
+                    Ok(().into())
+                }
+            }
+        }
     }
 
     impl<T: Config> LocQuery<T::LocId, <T as frame_system::Config>::AccountId> for Pallet<T> {
@@ -1675,7 +1712,7 @@ pub mod pallet {
                         mutable_replacer_loc.replacer_of = Some(loc_id);
                     });
                 }
-    
+
                 if loc.loc_type == LocType::Collection && !loc.closed && loc.value_fee > 0_u32.into() {
                     match loc.requester {
                         Account(requester_account) => {
@@ -1684,7 +1721,7 @@ pub mod pallet {
                         _ => {},
                     }
                 }
-    
+
                 Self::deposit_event(Event::LocVoid(loc_id));
                 Ok(().into())
             }
@@ -1846,55 +1883,6 @@ pub mod pallet {
         {
             let mut uniq = BTreeSet::new();
             iter.into_iter().all(move |x| uniq.insert(x))
-        }
-
-        fn do_close(
-            origin: OriginFor<T>,
-            loc_id: T::LocId,
-            seal: Option<<T as Config>::Hash>,
-        ) -> DispatchResultWithPostInfo {
-            let who = ensure_signed(origin)?;
-
-            if ! <LocMap<T>>::contains_key(&loc_id) {
-                Err(Error::<T>::NotFound)?
-            } else {
-                let loc = <LocMap<T>>::get(&loc_id).unwrap();
-                if loc.owner != who {
-                    Err(Error::<T>::Unauthorized)?
-                } else if loc.void_info.is_some() {
-                    Err(Error::<T>::CannotMutateVoid)?
-                } else if loc.closed {
-                    Err(Error::<T>::AlreadyClosed)?
-                } else if Self::has_unacknowledged_items(&loc) {
-                    Err(Error::<T>::CannotCloseUnacknowledged)?
-                } else {
-                    <LocMap<T>>::mutate(loc_id, |loc| {
-                        let mutable_loc = loc.as_mut().unwrap();
-                        mutable_loc.closed = true;
-                        mutable_loc.seal = seal;
-                    });
-
-                    if loc.loc_type == LocType::Collection && loc.value_fee > 0_u32.into() {
-                        match loc.requester {
-                            Account(requester_account) => {
-                                let (credit, _) = T::Currency::slash_reserved(&requester_account, loc.value_fee);
-                                T::RewardDistributor::distribute(credit, T::ValueFeeDistributionKey::get());
-                                Self::deposit_event(Event::ValueFeeWithdrawn(requester_account, loc.value_fee));
-                            },
-                            _ => {},
-                        }
-                    }
-
-                    Self::deposit_event(Event::LocClosed(loc_id));
-                    Ok(().into())
-                }
-            }
-        }
-
-        fn has_unacknowledged_items(loc: &LegalOfficerCaseOf<T>) -> bool {
-            loc.files.iter().find(|file| { !file.acknowledged_by_owner }).is_some()
-                || loc.metadata.iter().find(|item| { !item.acknowledged_by_owner }).is_some()
-                || loc.links.iter().find(|link| { !link.acknowledged_by_owner }).is_some()
         }
 
         fn do_add_collection_item(
