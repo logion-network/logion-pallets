@@ -1163,22 +1163,6 @@ pub mod pallet {
             terms_and_conditions: Vec<TermsAndConditionsElement<T::LocId, <T as Config>::Hash>>,
         ) -> DispatchResultWithPostInfo { Self::do_add_collection_item(origin, collection_loc_id, item_id, item_description, item_files, item_token, restricted_delivery, terms_and_conditions) }
 
-        /// Adds an item with terms and conditions to a collection
-        ///
-        /// DEPRECATED - this extrinsic will be removed in a future release, use add_collection_item instead
-        #[pallet::call_index(13)]
-        #[pallet::weight(T::WeightInfo::add_collection_item())]
-        pub fn add_collection_item_with_terms_and_conditions(
-            origin: OriginFor<T>,
-            #[pallet::compact] collection_loc_id: T::LocId,
-            item_id: T::CollectionItemId,
-            item_description: <T as Config>::Hash,
-            item_files: Vec<CollectionItemFileOf<T>>,
-            item_token: Option<CollectionItemToken<T::TokenIssuance, <T as Config>::Hash>>,
-            restricted_delivery: bool,
-            terms_and_conditions: Vec<TermsAndConditionsElement<<T as pallet::Config>::LocId, <T as Config>::Hash>>,
-        ) -> DispatchResultWithPostInfo { Self::do_add_collection_item(origin, collection_loc_id, item_id, item_description, item_files, item_token, restricted_delivery, terms_and_conditions) }
-
         /// Nominate an issuer
         #[pallet::call_index(14)]
         #[pallet::weight(T::WeightInfo::nominate_issuer())]

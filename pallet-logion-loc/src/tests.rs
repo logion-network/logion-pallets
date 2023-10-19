@@ -313,6 +313,7 @@ fn it_fails_to_close_with_metadata_unacknowledged_by_verified_issuer() {
         assert_err!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, None, true), Error::<Test>::CannotCloseUnacknowledgedByVerifiedIssuer);
 
         let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert!(!loc.closed);
         assert_eq!(loc.metadata[0], expected_metadata(metadata.clone(), NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
     });
 }
@@ -561,6 +562,7 @@ fn it_fails_to_close_with_file_unacknowledged_by_verified_issuer() {
         assert_err!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, None, true), Error::<Test>::CannotCloseUnacknowledgedByVerifiedIssuer);
 
         let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert!(!loc.closed);
         assert_eq!(loc.files[0], expected_file(&file, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
     });
 }
@@ -851,6 +853,7 @@ fn it_fails_to_close_with_link_unacknowledged_by_verified_issuer() {
         assert_err!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, None, true), Error::<Test>::CannotCloseUnacknowledgedByVerifiedIssuer);
 
         let loc = LogionLoc::loc(LOC_ID).unwrap();
+        assert!(!loc.closed);
         assert_eq!(loc.links[0], expected_link(&link, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
     });
 }
@@ -1262,7 +1265,7 @@ fn it_fails_to_item_with_terms_and_conditions_when_non_existent_tc_loc() {
             tc_loc: LOGION_CLASSIFICATION_LOC_ID,
             details: sha256(&terms_and_conditions_details),
         }];
-        assert_err!(LogionLoc::add_collection_item_with_terms_and_conditions(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], None, false, terms_and_conditions), Error::<Test>::TermsAndConditionsLocNotFound);
+        assert_err!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], None, false, terms_and_conditions), Error::<Test>::TermsAndConditionsLocNotFound);
     });
 }
 
@@ -1282,7 +1285,7 @@ fn it_fails_to_item_with_terms_and_conditions_when_open_tc_loc() {
             tc_loc: LOGION_CLASSIFICATION_LOC_ID,
             details: terms_and_conditions_details.clone(),
         }];
-        assert_err!(LogionLoc::add_collection_item_with_terms_and_conditions(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], None, false, terms_and_conditions), Error::<Test>::TermsAndConditionsLocNotClosed);
+        assert_err!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], None, false, terms_and_conditions), Error::<Test>::TermsAndConditionsLocNotClosed);
     });
 }
 
@@ -1303,7 +1306,7 @@ fn it_fails_to_item_with_terms_and_conditions_when_void_tc_loc() {
             tc_loc: LOGION_CLASSIFICATION_LOC_ID,
             details: terms_and_conditions_details,
         }];
-        assert_err!(LogionLoc::add_collection_item_with_terms_and_conditions(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], None, false, terms_and_conditions), Error::<Test>::TermsAndConditionsLocVoid);
+        assert_err!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], None, false, terms_and_conditions), Error::<Test>::TermsAndConditionsLocVoid);
     });
 }
 
@@ -1331,7 +1334,7 @@ fn it_adds_item_with_terms_and_conditions_to_closed_collection_loc() {
             details: sha256(&"Some more details".as_bytes().to_vec()),
         };
         let terms_and_conditions = vec![tc1, tc2];
-        assert_ok!(LogionLoc::add_collection_item_with_terms_and_conditions(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], None, false, terms_and_conditions.clone()));
+        assert_ok!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], None, false, terms_and_conditions.clone()));
         assert_eq!(LogionLoc::collection_items(LOC_ID, collection_item_id), Some(CollectionItem {
             description: collection_item_description,
             files: vec![],
