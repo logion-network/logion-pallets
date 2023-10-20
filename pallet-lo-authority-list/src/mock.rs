@@ -1,12 +1,13 @@
 use crate::{self as pallet_lo_authority_list, HostData, HostDataOf};
+use codec::{Encode, Decode};
+use frame_support::parameter_types;
+use frame_system::{self as system, EnsureRoot};
+use scale_info::TypeInfo;
 use sp_core::hash::H256;
-use frame_support::{parameter_types, codec::{Encode, Decode}};
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup}, testing::Header, generic,
     BuildStorage,
 };
-use frame_system::{self as system, EnsureRoot};
-use scale_info::TypeInfo;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 

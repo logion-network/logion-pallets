@@ -20,7 +20,7 @@ pub mod pallet {
     };
     use logion_shared::{CreateRecoveryCallFactory, LocQuery};
     use frame_support::traits::UnfilteredDispatchable;
-    use frame_support::dispatch::Vec;
+    use sp_std::vec::Vec;
     pub use crate::weights::WeightInfo;
 
     #[pallet::config]

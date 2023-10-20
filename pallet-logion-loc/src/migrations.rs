@@ -1,9 +1,9 @@
-use frame_support::codec::{Decode, Encode};
+use codec::{Decode, Encode};
 use frame_support::traits::Get;
-use frame_support::dispatch::Vec;
 use frame_support::weights::Weight;
 use frame_support::traits::OnRuntimeUpgrade;
 use frame_system::pallet_prelude::BlockNumberFor;
+use sp_std::vec::Vec;
 
 use crate::{Config, PalletStorageVersion, pallet::StorageVersion};
 use super::*;

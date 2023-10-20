@@ -18,10 +18,9 @@ pub mod pallet {
     };
     use logion_shared::{MultisigApproveAsMultiCallFactory, MultisigAsMultiCallFactory, IsLegalOfficer};
     use frame_support::traits::UnfilteredDispatchable;
-    use frame_support::dispatch::Vec;
     use pallet_multisig::{WeightInfo, Timepoint};
     use sp_runtime::traits::Dispatchable;
-    use sp_std::{convert::TryInto,boxed::Box};
+    use sp_std::{convert::TryInto, boxed::Box, vec::Vec};
 
     #[pallet::config]
     pub trait Config: frame_system::Config {

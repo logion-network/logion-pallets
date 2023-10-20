@@ -1,8 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use frame_support::codec::{Decode, Encode};
-use frame_support::dispatch::Vec;
+use codec::{Decode, Encode};
 use scale_info::TypeInfo;
+use sp_std::vec::Vec;
 
 pub use pallet::*;
 

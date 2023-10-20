@@ -17,19 +17,21 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+use codec::{Decode, Encode};
 use frame_support::{
     BoundedVec,
-    codec::{Decode, Encode},
-    dispatch::Vec,
     pallet_prelude::Weight,
     sp_runtime::Saturating,
-    traits::{Currency, ReservableCurrency}
+    traits::{Currency, ReservableCurrency},
 };
 use scale_info::TypeInfo;
 use logion_shared::LegalOfficerCaseSummary;
 use crate::Requester::Account;
 use frame_system::pallet_prelude::BlockNumberFor;
-use sp_std::collections::btree_set::BTreeSet;
+use sp_std::{
+    collections::btree_set::BTreeSet,
+    vec::Vec,
+};
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
 pub enum LocType {

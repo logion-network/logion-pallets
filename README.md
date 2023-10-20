@@ -12,7 +12,7 @@ This repo groups all logion pallets and their shared library in a single place:
 
 ## History
 
-Previously, the above components had their own repositories which are now archived:
+Previously, some of the above components had their own repositories which are now archived:
 
 - [logion-shared](https://github.com/logion-network/logion-shared)
 - [pallet-lo-authority-list](https://github.com/logion-network/pallet-lo-authority-list)

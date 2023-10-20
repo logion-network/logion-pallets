@@ -1,17 +1,18 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+use codec::{Decode, Encode};
 use frame_support::{
-    dispatch::{GetDispatchInfo, Vec, Weight},
+    dispatch::{GetDispatchInfo},
     Parameter,
     traits::{EnsureOrigin, UnfilteredDispatchable, Imbalance},
 };
-use frame_support::codec::{Decode, Encode};
 use frame_support::dispatch::DispatchResultWithPostInfo;
-use frame_support::scale_info::TypeInfo;
 use frame_support::sp_runtime::Percent;
 use frame_support::traits::tokens::Balance;
 use frame_system::{ensure_signed, RawOrigin};
-use sp_std::boxed::Box;
+use scale_info::TypeInfo;
+use sp_std::{boxed::Box, vec::Vec};
+use sp_weights::Weight;
 
 #[cfg(test)]
 mod tests;

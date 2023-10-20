@@ -2,13 +2,14 @@ use crate::{self as pallet_logion_vault};
 use logion_shared::{IsLegalOfficer, MultisigApproveAsMultiCallFactory, MultisigAsMultiCallFactory};
 use pallet_multisig::Timepoint;
 use sp_core::hash::H256;
-use frame_support::{parameter_types, dispatch::Weight, traits::EnsureOrigin};
+use frame_support::{parameter_types, traits::EnsureOrigin};
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup}, testing::Header, generic, BuildStorage,
 };
 use frame_system as system;
 use sp_std::convert::{TryInto, TryFrom};
 use system::{ensure_signed, pallet_prelude::BlockNumberFor};
+use sp_weights::Weight;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 

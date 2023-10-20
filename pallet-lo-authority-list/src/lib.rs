@@ -1,21 +1,25 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use sp_std::str::FromStr;
-use sp_std::fmt::Debug;
+use codec::{Decode, Encode};
 
-use frame_support::codec::{Decode, Encode};
-use frame_support::dispatch::{DispatchResultWithPostInfo, Vec};
+use frame_support::dispatch::DispatchResultWithPostInfo;
 use frame_support::error::BadOrigin;
 use frame_support::{
     sp_runtime,
     traits::EnsureOrigin,
 };
+
 use logion_shared::{IsLegalOfficer, LegalOfficerCreation};
 use scale_info::{TypeInfo, prelude::string::String};
-use sp_core::OpaquePeerId as PeerId;
-use sp_std::collections::btree_set::BTreeSet;
-
 use serde::{Deserialize, Serialize};
+
+use sp_core::OpaquePeerId as PeerId;
+use sp_std::{
+    collections::btree_set::BTreeSet,
+    fmt::Debug,
+    str::FromStr,
+    vec::Vec
+};
 
 pub use pallet::*;
 

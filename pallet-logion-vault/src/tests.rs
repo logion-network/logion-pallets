@@ -1,8 +1,8 @@
 use crate::{mock::*, Error};
-use frame_support::weights::Weight;
 use frame_support::{assert_err, assert_ok};
 use sp_runtime::traits::BlakeTwo256;
 use sp_runtime::traits::Hash;
+use sp_weights::Weight;
 
 #[test]
 fn it_requests_call_if_not_legal_officer() {
