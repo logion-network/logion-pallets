@@ -3043,3 +3043,54 @@ fn it_fails_creating_collection_loc_with_invalid_link_submitter() {
         );
     });
 }
+
+#[test]
+fn it_applies_storage_fees_on_transaction_creation() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let file = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+            size: 4,
+        };
+        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, Some(0u128), ItemsParams::only_files(Vec::from([ file.clone() ]))));
+        let fees = Fees::only_storage(1, 4);
+        fees.assert_balances_events(snapshot);
+    });
+}
+
+#[test]
+fn it_applies_storage_fees_on_identity_creation() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let file = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+            size: 4,
+        };
+        assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, Some(0u128), ItemsParams::only_files(Vec::from([ file.clone() ]))));
+        let fees = Fees::only_storage(1, 4);
+        fees.assert_balances_events(snapshot);
+    });
+}
+
+#[test]
+fn it_applies_storage_fees_on_collection_creation() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let file = FileParams {
+            hash: sha256(&"test".as_bytes().to_vec()),
+            nature: sha256(&"Test".as_bytes().to_vec()),
+            submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+            size: 4,
+        };
+        assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), true, 0, Some(0u128), ItemsParams::only_files(Vec::from([ file ]))));
+        let fees = Fees::only_storage(1, 4);
+        fees.assert_balances_events(snapshot);
+    });
+}

@@ -866,6 +866,10 @@ pub mod pallet {
                 let mut loc = Self::build_open_loc(&legal_officer, &requester, LocType::Identity, None, legal_fee);
                 loc.ensure_can_add::<T>(&items)?;
                 Self::ensure_valid_links(&items.links)?;
+                let tot_size = items.files.iter()
+                    .map(|file| file.size)
+                    .fold(0, |tot, current| tot + current);
+                Self::apply_file_storage_fee(&requester_account_id, items.files.len(), tot_size)?;
                 loc.add_items(&requester_account_id, &items);
 
                 Self::apply_legal_fee(&loc)?;
@@ -920,6 +924,10 @@ pub mod pallet {
                 let mut loc = Self::build_open_loc(&legal_officer, &requester, LocType::Transaction, None, legal_fee);
                 loc.ensure_can_add::<T>(&items)?;
                 Self::ensure_valid_links(&items.links)?;
+                let tot_size = items.files.iter()
+                    .map(|file| file.size)
+                    .fold(0, |tot, current| tot + current);
+                Self::apply_file_storage_fee(&requester_account_id, items.files.len(), tot_size)?;
                 loc.add_items(&requester_account_id, &items);
 
                 Self::apply_legal_fee(&loc)?;
@@ -1001,6 +1009,10 @@ pub mod pallet {
                 );
                 loc.ensure_can_add::<T>(&items)?;
                 Self::ensure_valid_links(&items.links)?;
+                let tot_size = items.files.iter()
+                    .map(|file| file.size)
+                    .fold(0, |tot, current| tot + current);
+                Self::apply_file_storage_fee(&requester_account_id, items.files.len(), tot_size)?;
                 loc.add_items(&requester_account_id, &items);
 
                 Self::apply_legal_fee(&loc)?;
