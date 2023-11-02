@@ -169,6 +169,18 @@ parameter_types! {
         reserve_percent: Percent::from_percent(0),
         treasury_percent: Percent::from_percent(100),
     };
+    pub const CollectionItemFeeDistributionKey: DistributionKey = DistributionKey {
+        stakers_percent: Percent::from_percent(25),
+        collators_percent: Percent::from_percent(25),
+        reserve_percent: Percent::from_percent(25),
+        treasury_percent: Percent::from_percent(25),
+    };
+    pub const TokensRecordFeeDistributionKey: DistributionKey = DistributionKey {
+        stakers_percent: Percent::from_percent(30),
+        collators_percent: Percent::from_percent(30),
+        reserve_percent: Percent::from_percent(30),
+        treasury_percent: Percent::from_percent(10),
+    };
 }
 
 pub struct LegalFeeImpl;
@@ -229,6 +241,8 @@ impl pallet_loc::Config for Test {
     type CertificateFeeDistributionKey = CertificateFeeDistributionKey;
     type TokenIssuance = TokenIssuance;
     type ValueFeeDistributionKey = ValueFeeDistributionKey;
+    type CollectionItemFeeDistributionKey = CollectionItemFeeDistributionKey;
+    type TokensRecordFeeDistributionKey = TokensRecordFeeDistributionKey;
 }
 
 // Build genesis storage according to the mock runtime.

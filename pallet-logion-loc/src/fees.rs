@@ -94,11 +94,18 @@ pub struct Fees {
     pub legal_fee_beneficiary: Option<Beneficiary<AccountId>>,
     pub certificate_fees: Balance,
     pub value_fee: Balance,
+    pub collection_item_fee: Balance,
+    pub tokens_record_fee: Balance,
 }
 impl Fees {
 
     pub fn total(&self) -> Balance {
-        self.storage_fees + self.legal_fees + self.certificate_fees + self.value_fee
+        self.storage_fees
+            + self.legal_fees
+            + self.certificate_fees
+            + self.value_fee
+            + self.collection_item_fee
+            + self.tokens_record_fee
     }
 
     pub fn only_storage(num_of_files: u32, tot_size: u32) -> Fees {
@@ -108,6 +115,20 @@ impl Fees {
             storage_fees: Self::storage_fees(num_of_files, tot_size),
             legal_fee_beneficiary: None,
             value_fee: 0,
+            collection_item_fee: 0,
+            tokens_record_fee: 0,
+        }
+    }
+
+    pub fn only_collection_item(fee: Balance) -> Fees {
+        Fees {
+            certificate_fees: 0,
+            legal_fees: 0,
+            storage_fees: 0,
+            legal_fee_beneficiary: None,
+            value_fee: 0,
+            collection_item_fee: fee,
+            tokens_record_fee: 0,
         }
     }
 
@@ -124,6 +145,8 @@ impl Fees {
             storage_fees: 0,
             legal_fee_beneficiary: Some(beneficiary),
             value_fee: 0,
+            collection_item_fee: 0,
+            tokens_record_fee: 0,
         }
     }
 
@@ -164,6 +187,20 @@ impl Fees {
             System::assert_has_event(RuntimeEvent::LogionLoc(crate::Event::ValueFeeWithdrawn {
                 0: previous_balances.payer_account,
                 1: self.value_fee,
+            }));
+        }
+
+        if self.collection_item_fee > 0 {
+            System::assert_has_event(RuntimeEvent::LogionLoc(crate::Event::CollectionItemFeeWithdrawn {
+                0: previous_balances.payer_account,
+                1: self.collection_item_fee,
+            }));
+        }
+
+        if self.tokens_record_fee > 0 {
+            System::assert_has_event(RuntimeEvent::LogionLoc(crate::Event::TokensRecordFeeWithdrawn {
+                0: previous_balances.payer_account,
+                1: self.tokens_record_fee,
             }));
         }
     }
