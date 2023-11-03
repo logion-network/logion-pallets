@@ -549,7 +549,7 @@ pub mod pallet {
         type FileStorageEntryFee: Get<BalanceOf<Self>>;
 
         /// Used to payout file storage fees
-        type RewardDistributor: RewardDistributor<NegativeImbalanceOf<Self>, BalanceOf<Self>>;
+        type RewardDistributor: RewardDistributor<NegativeImbalanceOf<Self>, BalanceOf<Self>, Self::AccountId>;
 
         /// Used to compute storage fees rewards
         type FileStorageFeeDistributionKey: Get<DistributionKey>;
@@ -695,10 +695,10 @@ pub mod pallet {
         CertificateFeeWithdrawn(T::AccountId, BalanceOf<T>),
         /// Issued when Value Fee is withdrawn. [payerAccountId, storageFee]
         ValueFeeWithdrawn(T::AccountId, BalanceOf<T>),
-        /// Issued when Collection Item Fee is withdrawn. [payerAccountId, fee]
-        CollectionItemFeeWithdrawn(T::AccountId, BalanceOf<T>),
-        /// Issued when Token Record Fee is withdrawn. [payerAccountId, fee]
-        TokensRecordFeeWithdrawn(T::AccountId, BalanceOf<T>),
+        /// Issued when Collection Item Fee is withdrawn. [payerAccountId, fee, beneficiary, amountReceived]
+        CollectionItemFeeWithdrawn(T::AccountId, BalanceOf<T>, Beneficiary<T::AccountId>, BalanceOf<T>),
+        /// Issued when Token Record Fee is withdrawn. [payerAccountId, fee, beneficiary, amountReceived]
+        TokensRecordFeeWithdrawn(T::AccountId, BalanceOf<T>, Beneficiary<T::AccountId>, BalanceOf<T>),
     }
 
     #[pallet::error]
@@ -809,6 +809,8 @@ pub mod pallet {
             assert!(T::FileStorageFeeDistributionKey::get().is_valid());
             assert!(T::CertificateFeeDistributionKey::get().is_valid());
             assert!(T::ValueFeeDistributionKey::get().is_valid());
+            assert!(T::CollectionItemFeeDistributionKey::get().is_valid());
+            assert!(T::TokensRecordFeeDistributionKey::get().is_valid());
         }
 
         #[cfg(feature = "try-runtime")]
@@ -1332,7 +1334,7 @@ pub mod pallet {
                     }
                     let fee_payer = match collection_loc.requester {
                         Account(requester_account) => requester_account,
-                        _ => collection_loc.owner
+                        _ => collection_loc.owner.clone()
                     };
 
                     let tot_size = files.iter()
@@ -1342,10 +1344,10 @@ pub mod pallet {
 
                     let fee = collection_loc.tokens_record_fee;
                     if fee > 0_u32.into() {
-                        Self::slash_and_distribute(&fee_payer, fee, &|credit| {
-                            T::RewardDistributor::distribute(credit, T::TokensRecordFeeDistributionKey::get())
+                        let (beneficiary, amount) = Self::slash_and_distribute(&fee_payer, fee, &|credit| {
+                            T::RewardDistributor::distribute_with_loc_owner(credit, T::TokensRecordFeeDistributionKey::get(), &collection_loc.owner)
                         })?;
-                        Self::deposit_event(Event::TokensRecordFeeWithdrawn(fee_payer, fee));
+                        Self::deposit_event(Event::TokensRecordFeeWithdrawn(fee_payer, fee, beneficiary, amount));
                     }
 
                     let record = TokensRecord {
@@ -1662,7 +1664,7 @@ pub mod pallet {
                         match loc.requester {
                             Account(requester_account) => {
                                 let (credit, _) = T::Currency::slash_reserved(&requester_account, loc.value_fee);
-                                T::RewardDistributor::distribute(credit, T::ValueFeeDistributionKey::get());
+                                T::RewardDistributor::distribute_with_loc_owner(credit, T::ValueFeeDistributionKey::get(), &loc.owner);
                                 Self::deposit_event(Event::ValueFeeWithdrawn(requester_account, loc.value_fee));
                             },
                             _ => {},
@@ -2019,7 +2021,7 @@ pub mod pallet {
                         Some(token) => {
                             let fee = Self::calculate_certificate_fee(token.token_issuance);
                             Self::slash_and_distribute(&who, fee, &|credit| {
-                                T::RewardDistributor::distribute(credit, T::CertificateFeeDistributionKey::get())
+                                T::RewardDistributor::distribute_with_loc_owner(credit, T::CertificateFeeDistributionKey::get(), &collection_loc.owner)
                             })?;
                             Self::deposit_event(Event::CertificateFeeWithdrawn(who.clone(), fee));
                         }
@@ -2028,10 +2030,10 @@ pub mod pallet {
 
                     let fee = collection_loc.collection_item_fee;
                     if fee > 0_u32.into() {
-                        Self::slash_and_distribute(&who, fee, &|credit| {
-                            T::RewardDistributor::distribute(credit, T::CollectionItemFeeDistributionKey::get())
+                        let (beneficiary, amount) = Self::slash_and_distribute(&who, fee, &|credit| {
+                            T::RewardDistributor::distribute_with_loc_owner(credit, T::CollectionItemFeeDistributionKey::get(), &collection_loc.owner)
                         })?;
-                        Self::deposit_event(Event::CollectionItemFeeWithdrawn(who.clone(), fee));
+                        Self::deposit_event(Event::CollectionItemFeeWithdrawn(who.clone(), fee, beneficiary, amount));
                     }
                 },
             }

@@ -96,6 +96,7 @@ pub struct DistributionKey {
     pub stakers_percent: Percent,
     pub collators_percent: Percent,
     pub treasury_percent: Percent,
+    pub loc_owner_percent: Percent,
 }
 
 impl DistributionKey {
@@ -107,8 +108,13 @@ impl DistributionKey {
         should_become_zero = should_become_zero - Self::into_signed(self.stakers_percent);
         should_become_zero = should_become_zero - Self::into_signed(self.collators_percent);
         should_become_zero = should_become_zero - Self::into_signed(self.treasury_percent);
+        should_become_zero = should_become_zero - Self::into_signed(self.loc_owner_percent);
 
         should_become_zero == 0
+    }
+
+    pub fn is_valid_without_loc_owner(&self) -> bool {
+        self.loc_owner_percent == Percent::zero() && self.is_valid()
     }
 
     fn into_signed(percent: Percent) -> i16 {
@@ -116,7 +122,7 @@ impl DistributionKey {
     }
 }
 
-pub trait RewardDistributor<I: Imbalance<B>, B: Balance> {
+pub trait RewardDistributor<I: Imbalance<B>, B: Balance, AccountId: Clone> {
 
     fn payout_collators(reward: I);
 
@@ -126,21 +132,47 @@ pub trait RewardDistributor<I: Imbalance<B>, B: Balance> {
 
     fn payout_treasury(reward: I);
 
+    fn payout_to(reward: I, account: &AccountId);
+
+    fn distribute_with_loc_owner(amount: I, distribution_key: DistributionKey, loc_owner: &AccountId) -> (Beneficiary<AccountId>, B) {
+        Self::_distribute(amount, distribution_key, Some(loc_owner))
+    }
+
     fn distribute(amount: I, distribution_key: DistributionKey) {
+        Self::_distribute(amount, distribution_key, None);
+    }
+
+    fn _distribute(amount: I, distribution_key: DistributionKey, loc_owner: Option<&AccountId>) -> (Beneficiary<AccountId>, B)  {
         let amount_balance = amount.peek();
 
         let stakers_part = distribution_key.stakers_percent * amount_balance;
         let collators_part = distribution_key.collators_percent * amount_balance;
         let treasury_part = distribution_key.treasury_percent * amount_balance;
+        let loc_owner_part = distribution_key.loc_owner_percent * amount_balance;
 
         let (stakers_imbalance, remainder1) = amount.split(stakers_part);
         let (collators_imbalance, remainder2) = remainder1.split(collators_part);
-        let (treasury_imbalance, reserve_imbalance) = remainder2.split(treasury_part);
+        let (loc_owner_imbalance, remainder3) = remainder2.split(loc_owner_part);
+        let (treasury_imbalance, reserve_imbalance) = remainder3.split(treasury_part);
 
         Self::payout_stakers(stakers_imbalance);
         Self::payout_reserve(reserve_imbalance);
         Self::payout_collators(collators_imbalance);
         Self::payout_treasury(treasury_imbalance);
+        match loc_owner {
+            Some(account) => {
+                if distribution_key.loc_owner_percent != Percent::zero() {
+                    let received = loc_owner_imbalance.peek();
+                    Self::payout_to(loc_owner_imbalance, account);
+                    (Beneficiary::LegalOfficer(account.clone()), received)
+                } else {
+                    (Beneficiary::Other, B::zero())
+                }
+            }
+            None => {
+                (Beneficiary::Other, B::zero())
+            }
+        }
     }
 
 }
@@ -149,7 +181,7 @@ pub type EuroCent = u32;
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
 pub enum Beneficiary<AccountId> {
-    Treasury,
+    Other,
     LegalOfficer(AccountId),
 }
 

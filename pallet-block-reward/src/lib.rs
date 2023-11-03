@@ -35,7 +35,7 @@ pub mod pallet {
         type Currency: Currency<Self::AccountId>;
 
         /// Used to payout rewards
-        type RewardDistributor: RewardDistributor<NegativeImbalanceOf<Self>, BalanceOf<Self>>;
+        type RewardDistributor: RewardDistributor<NegativeImbalanceOf<Self>, BalanceOf<Self>, Self::AccountId>;
 
         /// The amount of issuance for each block.
         #[pallet::constant]
@@ -54,7 +54,7 @@ pub mod pallet {
         }
 
         fn integrity_test() {
-            assert!(T::DistributionKey::get().is_valid());
+            assert!(T::DistributionKey::get().is_valid_without_loc_owner());
         }
     }
 

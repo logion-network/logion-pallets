@@ -1523,7 +1523,7 @@ fn it_adds_item_with_token() {
         let fees = Fees {
             storage_fees: Fees::storage_fees(1, collection_item_files[0].size),
             legal_fees: 0,
-            legal_fee_beneficiary: None,
+            fee_beneficiary: None,
             certificate_fees: 8_000_000_000_000_000,
             value_fee: 0,
             collection_item_fee: 0,
@@ -1944,15 +1944,7 @@ fn it_adds_tokens_record(submitter: AccountId) {
         assert_eq!(record.files[0].size, record_files[0].size);
         assert_eq!(record.files[0].hash, record_files[0].hash);
 
-        let fees = Fees {
-            certificate_fees: 0,
-            legal_fees: 0,
-            storage_fees: Fees::storage_fees(1, record_files[0].size),
-            legal_fee_beneficiary: None,
-            value_fee: 0,
-            collection_item_fee: 0,
-            tokens_record_fee: TOKENS_RECORD_FEE,
-        };
+        let fees = Fees::only_storage_and_tokens_record(1, record_files[0].size, TOKENS_RECORD_FEE, Beneficiary::LegalOfficer(LOC_OWNER1));
         fees.assert_balances_events(snapshot);
     });
 }
@@ -2008,15 +2000,7 @@ fn it_fails_adding_tokens_record_already_exists() {
         assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files.clone()), Error::<Test>::TokensRecordAlreadyExists);
         let file = record_files.get(0).unwrap();
 
-        let fees = Fees {
-            certificate_fees: 0,
-            legal_fees: 0,
-            storage_fees: Fees::storage_fees(1, file.size),
-            legal_fee_beneficiary: None,
-            value_fee: 0,
-            collection_item_fee: 0,
-            tokens_record_fee: TOKENS_RECORD_FEE,
-        };
+        let fees = Fees::only_storage_and_tokens_record(1, file.size, TOKENS_RECORD_FEE, Beneficiary::LegalOfficer(LOC_OWNER1));
         fees.assert_balances_events(snapshot);
     });
 }
@@ -2308,7 +2292,7 @@ fn it_creates_ethereum_identity_loc() {
         assert_eq!(LogionLoc::sponsorship(sponsorship_id).unwrap().loc_id, Some(LOC_ID));
         System::assert_has_event(RuntimeEvent::LogionLoc(crate::Event::LocCreated { 0: LOC_ID }));
 
-        let fees = Fees::only_legal(160 * ONE_LGNT, Beneficiary::Treasury);
+        let fees = Fees::only_legal(160 * ONE_LGNT, Beneficiary::Other);
         fees.assert_balances_events(snapshot);
     });
 }
@@ -2342,7 +2326,7 @@ fn it_creates_polkadot_identity_loc() {
         assert_eq!(LogionLoc::account_locs(LOC_REQUESTER_ID), Some(vec![LOC_ID]));
         System::assert_has_event(RuntimeEvent::LogionLoc(crate::Event::LocCreated { 0: LOC_ID }));
 
-        let fees = Fees::only_legal(160 * ONE_LGNT, Beneficiary::Treasury);
+        let fees = Fees::only_legal(160 * ONE_LGNT, Beneficiary::Other);
         fees.assert_balances_events(snapshot);
     });
 }
@@ -2505,7 +2489,7 @@ fn it_captures_value_fees() {
 
         let fees = Fees {
             certificate_fees: 0,
-            legal_fee_beneficiary: None,
+            fee_beneficiary: None,
             legal_fees: 0,
             storage_fees: 0,
             value_fee,
@@ -3140,7 +3124,7 @@ fn it_applies_collection_item_fee() {
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
         let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
         assert_ok!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], None, false, Vec::new()));
-        let fees = Fees::only_collection_item(collection_item_fee);
+        let fees = Fees::only_collection_item(collection_item_fee, Beneficiary::LegalOfficer(LOC_OWNER1));
         fees.assert_balances_events(snapshot);
     });
 }

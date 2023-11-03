@@ -125,7 +125,7 @@ pub const STAKERS_ACCOUNT: AccountId = 22;
 
 // Type used as beneficiary payout handle
 pub struct RewardDistributor;
-impl logion_shared::RewardDistributor<NegativeImbalanceOf<Test>, Balance>
+impl logion_shared::RewardDistributor<NegativeImbalanceOf<Test>, Balance, AccountId>
 for RewardDistributor
 {
     fn payout_reserve(reward: NegativeImbalanceOf<Test>) {
@@ -143,6 +143,10 @@ for RewardDistributor
     fn payout_treasury(reward: NegativeImbalanceOf<Test>) {
         Balances::resolve_creating(&TREASURY_ACCOUNT_ID, reward);
     }
+
+    fn payout_to(reward: NegativeImbalanceOf<Test>, account: &AccountId) {
+        Balances::resolve_creating(account, reward);
+    }
 }
 
 parameter_types! {
@@ -153,6 +157,7 @@ parameter_types! {
         collators_percent: Percent::from_percent(30),
         reserve_percent: Percent::from_percent(20),
         treasury_percent: Percent::from_percent(0),
+        loc_owner_percent: Percent::from_percent(0),
     };
     pub const ExchangeRate: Balance = 200_000_000_000_000_000; // 1 euro cent = 0.2 LGNT;
     pub const TreasuryAccountId: u64 = TREASURY_ACCOUNT_ID;
@@ -162,24 +167,21 @@ parameter_types! {
         collators_percent: Percent::from_percent(30),
         reserve_percent: Percent::from_percent(20),
         treasury_percent: Percent::from_percent(0),
+        loc_owner_percent: Percent::from_percent(0),
     };
     pub const ValueFeeDistributionKey: DistributionKey = DistributionKey {
         stakers_percent: Percent::from_percent(0),
         collators_percent: Percent::from_percent(0),
         reserve_percent: Percent::from_percent(0),
         treasury_percent: Percent::from_percent(100),
+        loc_owner_percent: Percent::from_percent(0),
     };
-    pub const CollectionItemFeeDistributionKey: DistributionKey = DistributionKey {
-        stakers_percent: Percent::from_percent(25),
-        collators_percent: Percent::from_percent(25),
-        reserve_percent: Percent::from_percent(25),
-        treasury_percent: Percent::from_percent(25),
-    };
-    pub const TokensRecordFeeDistributionKey: DistributionKey = DistributionKey {
-        stakers_percent: Percent::from_percent(30),
-        collators_percent: Percent::from_percent(30),
-        reserve_percent: Percent::from_percent(30),
-        treasury_percent: Percent::from_percent(10),
+    pub const RecurentFeeDistributionKey: DistributionKey = DistributionKey {
+        stakers_percent: Percent::from_percent(0),
+        collators_percent: Percent::from_percent(0),
+        reserve_percent: Percent::from_percent(0),
+        treasury_percent: Percent::from_percent(95),
+        loc_owner_percent: Percent::from_percent(5),
     };
 }
 
@@ -195,7 +197,7 @@ impl LegalFee<NegativeImbalanceOf<Test>, Balance, LocType, AccountId> for LegalF
     fn distribute(amount: NegativeImbalanceOf<Test>, loc_type: LocType, loc_owner: AccountId) -> Beneficiary<AccountId> {
 
         let (beneficiary, target) = match loc_type {
-            LocType::Identity => (Beneficiary::Treasury, TREASURY_ACCOUNT_ID),
+            LocType::Identity => (Beneficiary::Other, TREASURY_ACCOUNT_ID),
             _ => (Beneficiary::LegalOfficer(loc_owner), loc_owner),
         };
         Balances::resolve_creating(&target, amount);
@@ -241,8 +243,8 @@ impl pallet_loc::Config for Test {
     type CertificateFeeDistributionKey = CertificateFeeDistributionKey;
     type TokenIssuance = TokenIssuance;
     type ValueFeeDistributionKey = ValueFeeDistributionKey;
-    type CollectionItemFeeDistributionKey = CollectionItemFeeDistributionKey;
-    type TokensRecordFeeDistributionKey = TokensRecordFeeDistributionKey;
+    type CollectionItemFeeDistributionKey = RecurentFeeDistributionKey;
+    type TokensRecordFeeDistributionKey = RecurentFeeDistributionKey;
 }
 
 // Build genesis storage according to the mock runtime.
