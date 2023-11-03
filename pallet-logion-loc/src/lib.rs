@@ -816,7 +816,6 @@ pub mod pallet {
             assert_eq!(PalletStorageVersion::<T>::get(), StorageVersion::default());
 
             LocMap::<T>::iter().for_each(|entry| {
-                let loc_id = entry.0;
                 let loc = entry.1;
 
                 assert_eq!(loc.collection_item_fee, 0_u32.into());
@@ -1341,12 +1340,12 @@ pub mod pallet {
                         .fold(0, |tot, current| tot + current);
                     Self::apply_file_storage_fee(&fee_payer, files.len(), tot_size)?;
 
-                    if collection_loc.tokens_record_fee > 0_u32.into() {
-                        let fee = collection_loc.tokens_record_fee.clone();
-                        ensure!(T::Currency::can_slash(&fee_payer, fee), Error::<T>::InsufficientFunds);
-                        let (credit, _) = T::Currency::slash(&fee_payer, fee);
-                        T::RewardDistributor::distribute(credit, T::TokensRecordFeeDistributionKey::get());
-                        Self::deposit_event(Event::TokensRecordFeeWithdrawn(fee_payer.clone(), fee));
+                    let fee = collection_loc.tokens_record_fee;
+                    if fee > 0_u32.into() {
+                        Self::slash_and_distribute(&fee_payer, fee, &|credit| {
+                            T::RewardDistributor::distribute(credit, T::TokensRecordFeeDistributionKey::get())
+                        })?;
+                        Self::deposit_event(Event::TokensRecordFeeWithdrawn(fee_payer, fee));
                     }
 
                     let record = TokensRecord {
@@ -2019,20 +2018,19 @@ pub mod pallet {
                     match item_token {
                         Some(token) => {
                             let fee = Self::calculate_certificate_fee(token.token_issuance);
-                            ensure!(T::Currency::can_slash(&who, fee), Error::<T>::InsufficientFunds);
-
-                            let (credit, _) = T::Currency::slash(&who, fee);
-                            T::RewardDistributor::distribute(credit, T::CertificateFeeDistributionKey::get());
+                            Self::slash_and_distribute(&who, fee, &|credit| {
+                                T::RewardDistributor::distribute(credit, T::CertificateFeeDistributionKey::get())
+                            })?;
                             Self::deposit_event(Event::CertificateFeeWithdrawn(who.clone(), fee));
                         }
                         _ => {}
                     };
 
-                    if collection_loc.collection_item_fee > 0_u32.into() {
-                        let fee = collection_loc.collection_item_fee.clone();
-                        ensure!(T::Currency::can_slash(&who, fee), Error::<T>::InsufficientFunds);
-                        let (credit, _) = T::Currency::slash(&who, fee);
-                        T::RewardDistributor::distribute(credit, T::CollectionItemFeeDistributionKey::get());
+                    let fee = collection_loc.collection_item_fee;
+                    if fee > 0_u32.into() {
+                        Self::slash_and_distribute(&who, fee, &|credit| {
+                            T::RewardDistributor::distribute(credit, T::CollectionItemFeeDistributionKey::get())
+                        })?;
                         Self::deposit_event(Event::CollectionItemFeeWithdrawn(who.clone(), fee));
                     }
                 },
@@ -2104,9 +2102,9 @@ pub mod pallet {
 
         fn apply_file_storage_fee(fee_payer: &T::AccountId, num_of_entries: usize, tot_size: u32) -> DispatchResult {
             let fee = Self::calculate_fee(num_of_entries as u32, tot_size);
-            ensure!(T::Currency::can_slash(&fee_payer, fee), Error::<T>::InsufficientFunds);
-            let (credit, _) = T::Currency::slash(&fee_payer, fee);
-            T::RewardDistributor::distribute(credit, T::FileStorageFeeDistributionKey::get());
+            Self::slash_and_distribute(&fee_payer, fee, &|credit| {
+                T::RewardDistributor::distribute(credit, T::FileStorageFeeDistributionKey::get())
+            })?;
             Self::deposit_event(Event::StorageFeeWithdrawn(fee_payer.clone(), fee));
             Ok(())
         }
@@ -2133,9 +2131,9 @@ pub mod pallet {
             };
             if fee_payer.is_some() {
                 let fee = Self::calculate_legal_fee(loc);
-                ensure!(T::Currency::can_slash(&fee_payer.as_ref().unwrap(), fee), Error::<T>::InsufficientFunds);
-                let (credit, _) = T::Currency::slash(&fee_payer.as_ref().unwrap(), fee);
-                let beneficiary = T::LegalFee::distribute(credit, loc.loc_type, loc.owner.clone());
+                let beneficiary = Self::slash_and_distribute(&fee_payer.as_ref().unwrap(), fee, &|credit| {
+                    T::LegalFee::distribute(credit, loc.loc_type, loc.owner.clone())
+                })?;
                 Self::deposit_event(Event::LegalFeeWithdrawn(fee_payer.unwrap(), beneficiary, fee));
             }
             Ok(())
@@ -2184,6 +2182,13 @@ pub mod pallet {
                 }
             }
             Ok(())
+        }
+
+        fn slash_and_distribute<F, R>(fee_payer: &T::AccountId, fee: BalanceOf<T>, distributor: &F) -> Result<R, sp_runtime::DispatchError>
+            where F: Fn(NegativeImbalanceOf<T>) -> R {
+            ensure!(T::Currency::can_slash(&fee_payer, fee), Error::<T>::InsufficientFunds);
+            let (credit, _) = T::Currency::slash(&fee_payer, fee);
+            Ok(distributor(credit))
         }
     }
 }
