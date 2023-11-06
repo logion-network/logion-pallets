@@ -89,7 +89,7 @@ pub const TREASURY_ACCOUNT: AccountId = 5;
 
 // Type used as beneficiary payout handle
 pub struct RewardDistributorImpl();
-impl RewardDistributor<NegativeImbalanceOf<Test>, Balance>
+impl RewardDistributor<NegativeImbalanceOf<Test>, Balance, AccountId>
 for RewardDistributorImpl
 {
     fn payout_reserve(reward: NegativeImbalanceOf<Test>) {
@@ -107,6 +107,10 @@ for RewardDistributorImpl
     fn payout_treasury(reward: NegativeImbalanceOf<Test>) {
         Balances::resolve_creating(&TREASURY_ACCOUNT, reward);
     }
+
+    fn payout_to(_reward: NegativeImbalanceOf<Test>, _account: &AccountId) {
+        panic!("Impossible to reward a given account with inflation")
+    }
 }
 
 pub const BLOCK_REWARD: Balance = 10_000_000_000_000_000_000; // 10 LGNT
@@ -118,6 +122,7 @@ parameter_types! {
         collators_percent: Percent::from_percent(30),
         reserve_percent: Percent::from_percent(20),
         treasury_percent: Percent::from_percent(0),
+        loc_owner_percent: Percent::from_percent(0),
     };
 }
 
