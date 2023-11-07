@@ -1343,7 +1343,7 @@ pub mod pallet {
                     }
                     let fee_payer = match collection_loc.requester {
                         Account(requester_account) => requester_account,
-                        _ => collection_loc.owner.clone()
+                        _ => panic!("Requester cannot pay the fees")
                     };
 
                     let tot_size = files.iter()
