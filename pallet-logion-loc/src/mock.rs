@@ -1,5 +1,5 @@
-use crate::{self as pallet_loc, LocType, NegativeImbalanceOf, RequesterOf, Hasher};
-use logion_shared::{DistributionKey, EuroCent, IsLegalOfficer, LegalFee};
+use crate::{self as pallet_loc, NegativeImbalanceOf, RequesterOf, Hasher};
+use logion_shared::{DistributionKey, IsLegalOfficer};
 use sp_core::hash::H256;
 use frame_support::{construct_runtime, parameter_types, traits::{EnsureOrigin, Currency}};
 use sp_io::hashing::sha2_256;
@@ -153,7 +153,6 @@ parameter_types! {
         logion_treasury_percent: Percent::from_percent(0),
         loc_owner_percent: Percent::from_percent(0),
     };
-    pub const ExchangeRate: Balance = 200_000_000_000_000_000; // 1 euro cent = 0.2 LGNT;
     pub const LogionTreasuryAccountId: u64 = LOGION_TREASURY_ACCOUNT_ID;
     pub const CertificateFee: u64 = 4_000_000_000_000_000; // 0.004 LGNT
     pub const CertificateFeeDistributionKey: DistributionKey = DistributionKey {
@@ -188,16 +187,6 @@ parameter_types! {
     };
 }
 
-pub struct LegalFeeImpl;
-impl LegalFee<LocType> for LegalFeeImpl {
-    fn get_default_legal_fee(loc_type: LocType) -> EuroCent {
-        match loc_type {
-            LocType::Identity => 8_00, // 8.00 euros
-            _ => 100_00, // 100.00 euros
-        }
-    }
-}
-
 pub struct SHA256;
 impl Hasher<H256> for SHA256 {
 
@@ -230,8 +219,6 @@ impl pallet_loc::Config for Test {
     type FileStorageFeeDistributionKey = FileStorageFeeDistributionKey;
     type EthereumAddress = EthereumAddress;
     type SponsorshipId = SponsorshipId;
-    type LegalFee = LegalFeeImpl;
-    type ExchangeRate = ExchangeRate;
     type CertificateFee = CertificateFee;
     type CertificateFeeDistributionKey = CertificateFeeDistributionKey;
     type TokenIssuance = TokenIssuance;

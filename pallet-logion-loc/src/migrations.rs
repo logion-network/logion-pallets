@@ -43,7 +43,28 @@ pub mod v22 {
     >;
 
     pub struct AddRecurrentFees<T>(sp_std::marker::PhantomData<T>);
-    impl<T: Config> OnRuntimeUpgrade for AddRecurrentFees<T> {
+
+    impl<T: Config> AddRecurrentFees<T>
+        where <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance: From<u128> {
+
+        fn calculate_default_legal_fee(loc: &LegalOfficerCaseV21Of<T>) -> BalanceOf<T> {
+            match loc.requester {
+                Requester::None => BalanceOf::<T>::zero(),   // logion identity has no legal fee
+                Requester::Loc(_) => BalanceOf::<T>::zero(), // logion transaction has no legal fee
+                _ => {
+                    let exchange_rate: BalanceOf<T> = 200_000_000_000_000_000u128.into(); // 1 euro cent = 0.2 LGNT
+                    let fee_in_euro_cent: u32 = match loc.loc_type {
+                        LocType::Identity => 8_00, // 8.00 euros
+                        _ => 100_00, // 100.00 euros
+                    };
+                    exchange_rate.saturating_mul(fee_in_euro_cent.into())
+                }
+            }
+        }
+    }
+
+    impl<T: Config> OnRuntimeUpgrade for AddRecurrentFees<T>
+        where <<T as pallet::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance: From<u128> {
 
         fn on_runtime_upgrade() -> Weight {
             super::do_storage_upgrade::<T, _>(
@@ -52,6 +73,10 @@ pub mod v22 {
                 "AddRecurrentFees",
                 || {
                     LocMap::<T>::translate_values(|loc: LegalOfficerCaseV21Of<T>| {
+                        let legal_fee = match loc.legal_fee {
+                            Some(value) => value,
+                            None => Self::calculate_default_legal_fee(&loc)
+                        };
                         Some(LegalOfficerCaseOf::<T> {
                             owner: loc.owner,
                             requester: loc.requester,
@@ -68,7 +93,7 @@ pub mod v22 {
                             seal: loc.seal,
                             sponsorship_id: loc.sponsorship_id,
                             value_fee: loc.value_fee,
-                            legal_fee: loc.legal_fee,
+                            legal_fee,
                             collection_item_fee: 0u32.into(),
                             tokens_record_fee: 0u32.into(),
                         })

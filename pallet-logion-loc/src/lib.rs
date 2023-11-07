@@ -32,6 +32,7 @@ use sp_std::{
     collections::btree_set::BTreeSet,
     vec::Vec,
 };
+use sp_runtime::traits::Zero;
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
 pub enum LocType {
@@ -220,7 +221,7 @@ pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress
     seal: Option<Hash>,
     sponsorship_id: Option<SponsorshipId>,
     value_fee: Balance,
-    legal_fee: Option<Balance>,
+    legal_fee: Balance,
     collection_item_fee: Balance,
     tokens_record_fee: Balance,
 }
@@ -486,7 +487,7 @@ pub mod pallet {
     use frame_support::traits::Currency;
     use logion_shared::{
         LocQuery, LocValidity, IsLegalOfficer, RewardDistributor,
-        DistributionKey, LegalFee, Beneficiary,
+        DistributionKey, Beneficiary,
     };
     use crate::SupportedAccountId::Polkadot;
     use super::*;
@@ -559,12 +560,6 @@ pub mod pallet {
 
         /// The identifier of a sponsorship
         type SponsorshipId: Member + Parameter + Default + Copy + HasCompact;
-
-        /// Used to determine default legal fees
-        type LegalFee: LegalFee<LocType>;
-
-        /// Exchange Rate LGNT/EURO cents, i.e. the amount of balance equivalent to 1 euro cent.
-        type ExchangeRate: Get<BalanceOf<Self>>;
 
         /// The certificate fee per issued token
         type CertificateFee: Get<BalanceOf<Self>>;
@@ -884,7 +879,7 @@ pub mod pallet {
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
             legal_officer: T::AccountId,
-            legal_fee: Option<BalanceOf<T>>,
+            legal_fee: BalanceOf<T>,
             items: ItemsParamsOf<T>,
         ) -> DispatchResultWithPostInfo {
             let requester_account_id = ensure_signed(origin)?;
@@ -927,7 +922,7 @@ pub mod pallet {
                 Err(Error::<T>::AlreadyExists)?
             } else {
                 let requester = RequesterOf::<T>::None;
-                let loc = Self::build_open_loc(&who, &requester, LocType::Identity, None, None);
+                let loc = Self::build_open_loc(&who, &requester, LocType::Identity, None, BalanceOf::<T>::zero());
                 <LocMap<T>>::insert(loc_id, loc);
 
                 Self::deposit_event(Event::LocCreated(loc_id));
@@ -942,7 +937,7 @@ pub mod pallet {
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
             legal_officer: T::AccountId,
-            legal_fee: Option<BalanceOf<T>>,
+            legal_fee: BalanceOf<T>,
             items: ItemsParamsOf<T>,
         ) -> DispatchResultWithPostInfo {
             let requester_account_id = ensure_signed(origin)?;
@@ -993,7 +988,7 @@ pub mod pallet {
                             Err(Error::<T>::UnexpectedRequester)?
                         } else {
                             let requester = RequesterOf::<T>::Loc(requester_loc_id.clone());
-                            let new_loc = Self::build_open_loc(&who, &requester, LocType::Transaction, None, None);
+                            let new_loc = Self::build_open_loc(&who, &requester, LocType::Transaction, None, BalanceOf::<T>::zero());
                             <LocMap<T>>::insert(loc_id, new_loc);
                             Self::link_with_identity_loc(&requester_loc_id, &loc_id);
                         },
@@ -1015,7 +1010,7 @@ pub mod pallet {
             collection_max_size: Option<u32>,
             collection_can_upload: bool,
             value_fee: BalanceOf<T>,
-            legal_fee: Option<BalanceOf<T>>,
+            legal_fee: BalanceOf<T>,
             collection_item_fee: BalanceOf<T>,
             tokens_record_fee: BalanceOf<T>,
             items: ItemsParamsOf<T>,
@@ -1379,6 +1374,7 @@ pub mod pallet {
             #[pallet::compact] loc_id: T::LocId,
             requester_account_id: OtherAccountId<T::EthereumAddress>,
             #[pallet::compact] sponsorship_id: T::SponsorshipId,
+            legal_fee: BalanceOf<T>,
         ) -> DispatchResultWithPostInfo {
             let who = T::IsLegalOfficer::ensure_origin(origin.clone())?;
 
@@ -1388,7 +1384,7 @@ pub mod pallet {
                 Err(Error::<T>::CannotLinkToSponsorship)?
             } else {
                 let requester = RequesterOf::<T>::OtherAccount(requester_account_id.clone());
-                let loc = Self::build_open_loc(&who, &requester, LocType::Identity, Some(sponsorship_id), None);
+                let loc = Self::build_open_loc(&who, &requester, LocType::Identity, Some(sponsorship_id), legal_fee);
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
@@ -1870,7 +1866,7 @@ pub mod pallet {
             requester: &RequesterOf<T>,
             loc_type: LocType,
             sponsorship_id: Option<T::SponsorshipId>,
-            legal_fee: Option<BalanceOf<T>>,
+            legal_fee: BalanceOf<T>,
         ) -> LegalOfficerCaseOf<T> {
             LegalOfficerCaseOf::<T> {
                 owner: legal_officer.clone(),
@@ -1901,7 +1897,7 @@ pub mod pallet {
             collection_max_size: Option<CollectionSize>,
             collection_can_upload: bool,
             value_fee: BalanceOf<T>,
-            legal_fee: Option<BalanceOf<T>>,
+            legal_fee: BalanceOf<T>,
             collection_item_fee: BalanceOf<T>,
             tokens_record_fee: BalanceOf<T>,
         ) -> LegalOfficerCaseOf<T> {
@@ -2141,7 +2137,7 @@ pub mod pallet {
                 }
             };
             if fee_payer.is_some() {
-                let fee = Self::calculate_legal_fee(loc);
+                let fee = loc.legal_fee;
                 let (beneficiary, _) = Self::slash_and_distribute(&fee_payer.as_ref().unwrap(), fee, &|credit| {
                     let distribution_key = match loc.loc_type {
                         LocType::Identity => T::IdentityLocLegalFeeDistributionKey::get(),
@@ -2153,19 +2149,6 @@ pub mod pallet {
                 Self::deposit_event(Event::LegalFeeWithdrawn(fee_payer.unwrap(), beneficiary, fee));
             }
             Ok(())
-        }
-
-        fn calculate_legal_fee(loc: &LegalOfficerCaseOf<T>) -> BalanceOf<T> {
-            match loc.legal_fee {
-                None => Self::calculate_default_legal_fee(loc.loc_type),
-                Some(legal_fee) => legal_fee,
-            }
-        }
-
-        pub fn calculate_default_legal_fee(loc_type: LocType) -> BalanceOf<T> {
-            let fee_in_euro_cent = T::LegalFee::get_default_legal_fee(loc_type);
-            let exchange_rate = T::ExchangeRate::get();
-            exchange_rate.saturating_mul(fee_in_euro_cent.into())
         }
 
         fn can_link_to_sponsorship(

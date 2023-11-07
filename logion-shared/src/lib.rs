@@ -170,16 +170,8 @@ pub trait RewardDistributor<I: Imbalance<B>, B: Balance, AccountId: Clone> {
 
 }
 
-pub type EuroCent = u32;
-
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
 pub enum Beneficiary<AccountId> {
     Other,
     LegalOfficer(AccountId),
-}
-
-pub trait LegalFee<LocType> {
-
-    fn get_default_legal_fee(loc_type: LocType) -> EuroCent;
-
 }
