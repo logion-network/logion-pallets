@@ -82,30 +82,25 @@ impl pallet_balances::Config for Test {
 }
 
 // Fake accounts used to simulate reward beneficiaries balances
-pub const RESERVE_ACCOUNT: AccountId = 2;
+pub const COMMUNITY_TREASURY_ACCOUNT: AccountId = 2;
 pub const COLLATORS_ACCOUNT: AccountId = 3;
-pub const STAKERS_ACCOUNT: AccountId = 4;
-pub const TREASURY_ACCOUNT: AccountId = 5;
+pub const LOGION_TREASURY_ACCOUNT: AccountId = 5;
 
 // Type used as beneficiary payout handle
 pub struct RewardDistributorImpl();
 impl RewardDistributor<NegativeImbalanceOf<Test>, Balance, AccountId>
 for RewardDistributorImpl
 {
-    fn payout_reserve(reward: NegativeImbalanceOf<Test>) {
-        Balances::resolve_creating(&RESERVE_ACCOUNT, reward);
+    fn payout_community_treasury(reward: NegativeImbalanceOf<Test>) {
+        Balances::resolve_creating(&COMMUNITY_TREASURY_ACCOUNT, reward);
     }
 
     fn payout_collators(reward: NegativeImbalanceOf<Test>) {
         Balances::resolve_creating(&COLLATORS_ACCOUNT, reward);
     }
 
-    fn payout_stakers(reward: NegativeImbalanceOf<Test>) {
-        Balances::resolve_creating(&STAKERS_ACCOUNT, reward);
-    }
-
-    fn payout_treasury(reward: NegativeImbalanceOf<Test>) {
-        Balances::resolve_creating(&TREASURY_ACCOUNT, reward);
+    fn payout_logion_treasury(reward: NegativeImbalanceOf<Test>) {
+        Balances::resolve_creating(&LOGION_TREASURY_ACCOUNT, reward);
     }
 
     fn payout_to(_reward: NegativeImbalanceOf<Test>, _account: &AccountId) {
@@ -118,10 +113,9 @@ pub const BLOCK_REWARD: Balance = 10_000_000_000_000_000_000; // 10 LGNT
 parameter_types! {
     pub const RewardAmount: Balance = BLOCK_REWARD;
     pub const RewardDistributionKey: DistributionKey = DistributionKey {
-        stakers_percent: Percent::from_percent(50),
-        collators_percent: Percent::from_percent(30),
-        reserve_percent: Percent::from_percent(20),
-        treasury_percent: Percent::from_percent(0),
+        collators_percent: Percent::from_percent(0),
+        community_treasury_percent: Percent::from_percent(100),
+        logion_treasury_percent: Percent::from_percent(0),
         loc_owner_percent: Percent::from_percent(0),
     };
 }

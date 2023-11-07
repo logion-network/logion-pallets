@@ -68,7 +68,7 @@ fn setup_default_balances() {
     set_balance(LOC_OWNER2, INITIAL_BALANCE);
     set_balance(ISSUER_ID1, INITIAL_BALANCE);
     set_balance(ISSUER_ID2, INITIAL_BALANCE);
-    set_balance(TREASURY_ACCOUNT_ID, INITIAL_BALANCE);
+    set_balance(LOGION_TREASURY_ACCOUNT_ID, INITIAL_BALANCE);
 }
 
 fn set_balance(account_id: AccountId, amount: Balance) {
@@ -2501,7 +2501,7 @@ fn it_captures_value_fees() {
 }
 
 #[test]
-fn it_frees_value_fees_reserve_on_void() {
+fn it_frees_value_fees_community_treasury_on_void() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         let value_fee = 100;
@@ -2514,7 +2514,7 @@ fn it_frees_value_fees_reserve_on_void() {
 }
 
 #[test]
-fn it_does_not_free_value_fees_reserve_on_void_closed() {
+fn it_does_not_free_value_fees_community_treasury_on_void_closed() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         let value_fee = 100;
