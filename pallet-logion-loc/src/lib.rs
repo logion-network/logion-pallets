@@ -548,7 +548,7 @@ pub mod pallet {
         /// The constant part of the Fee to pay to store a file.
         type FileStorageEntryFee: Get<BalanceOf<Self>>;
 
-        /// Used to payout file storage fees
+        /// Used to payout fees
         type RewardDistributor: RewardDistributor<NegativeImbalanceOf<Self>, BalanceOf<Self>, Self::AccountId>;
 
         /// Used to compute storage fees rewards
@@ -560,8 +560,8 @@ pub mod pallet {
         /// The identifier of a sponsorship
         type SponsorshipId: Member + Parameter + Default + Copy + HasCompact;
 
-        /// Used to payout legal fees
-        type LegalFee: LegalFee<NegativeImbalanceOf<Self>, BalanceOf<Self>, LocType, Self::AccountId>;
+        /// Used to determine default legal fees
+        type LegalFee: LegalFee<LocType>;
 
         /// Exchange Rate LGNT/EURO cents, i.e. the amount of balance equivalent to 1 euro cent.
         type ExchangeRate: Get<BalanceOf<Self>>;
@@ -583,6 +583,15 @@ pub mod pallet {
 
         /// Used to compute token record fees rewards
         type TokensRecordFeeDistributionKey: Get<DistributionKey>;
+
+        /// Used to payout legal fees of an Identity LOC
+        type IdentityLocLegalFeeDistributionKey: Get<DistributionKey>;
+
+        /// Used to payout legal fees of a Transaction LOC
+        type TransactionLocLegalFeeDistributionKey: Get<DistributionKey>;
+
+        /// Used to payout legal fees of a Collection LOC
+        type CollectionLocLegalFeeDistributionKey: Get<DistributionKey>;
     }
 
     #[pallet::pallet]
@@ -2133,8 +2142,13 @@ pub mod pallet {
             };
             if fee_payer.is_some() {
                 let fee = Self::calculate_legal_fee(loc);
-                let beneficiary = Self::slash_and_distribute(&fee_payer.as_ref().unwrap(), fee, &|credit| {
-                    T::LegalFee::distribute(credit, loc.loc_type, loc.owner.clone())
+                let (beneficiary, _) = Self::slash_and_distribute(&fee_payer.as_ref().unwrap(), fee, &|credit| {
+                    let distribution_key = match loc.loc_type {
+                        LocType::Identity => T::IdentityLocLegalFeeDistributionKey::get(),
+                        LocType::Transaction => T::TransactionLocLegalFeeDistributionKey::get(),
+                        LocType::Collection => T::CollectionItemFeeDistributionKey::get(),
+                    };
+                    T::RewardDistributor::distribute_with_loc_owner(credit, distribution_key, &loc.owner.clone())
                 })?;
                 Self::deposit_event(Event::LegalFeeWithdrawn(fee_payer.unwrap(), beneficiary, fee));
             }

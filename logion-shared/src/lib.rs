@@ -178,10 +178,8 @@ pub enum Beneficiary<AccountId> {
     LegalOfficer(AccountId),
 }
 
-pub trait LegalFee<I: Imbalance<B>, B: Balance, LocType, AccountId> {
+pub trait LegalFee<LocType> {
 
     fn get_default_legal_fee(loc_type: LocType) -> EuroCent;
 
-    /// Determine, distribute to, and return the beneficiary of Legal fee.
-    fn distribute(amount: I, loc_type: LocType, loc_owner: AccountId) -> Beneficiary<AccountId>;
 }

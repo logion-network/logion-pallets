@@ -1,5 +1,5 @@
 use crate::{self as pallet_loc, LocType, NegativeImbalanceOf, RequesterOf, Hasher};
-use logion_shared::{Beneficiary, DistributionKey, EuroCent, IsLegalOfficer, LegalFee};
+use logion_shared::{DistributionKey, EuroCent, IsLegalOfficer, LegalFee};
 use sp_core::hash::H256;
 use frame_support::{construct_runtime, parameter_types, traits::{EnsureOrigin, Currency}};
 use sp_io::hashing::sha2_256;
@@ -174,25 +174,27 @@ parameter_types! {
         logion_treasury_percent: Percent::from_percent(95),
         loc_owner_percent: Percent::from_percent(5),
     };
+    pub const IdentityLocLegalFeeDistributionKey: DistributionKey = DistributionKey {
+        collators_percent: Percent::from_percent(0),
+        community_treasury_percent: Percent::from_percent(0),
+        logion_treasury_percent: Percent::from_percent(100),
+        loc_owner_percent: Percent::from_percent(0),
+    };
+    pub const OtherLocLegalFeeDistributionKey: DistributionKey = DistributionKey {
+        collators_percent: Percent::from_percent(0),
+        community_treasury_percent: Percent::from_percent(0),
+        logion_treasury_percent: Percent::from_percent(0),
+        loc_owner_percent: Percent::from_percent(100),
+    };
 }
 
 pub struct LegalFeeImpl;
-impl LegalFee<NegativeImbalanceOf<Test>, Balance, LocType, AccountId> for LegalFeeImpl {
+impl LegalFee<LocType> for LegalFeeImpl {
     fn get_default_legal_fee(loc_type: LocType) -> EuroCent {
         match loc_type {
             LocType::Identity => 8_00, // 8.00 euros
             _ => 100_00, // 100.00 euros
         }
-    }
-
-    fn distribute(amount: NegativeImbalanceOf<Test>, loc_type: LocType, loc_owner: AccountId) -> Beneficiary<AccountId> {
-
-        let (beneficiary, target) = match loc_type {
-            LocType::Identity => (Beneficiary::Other, LOGION_TREASURY_ACCOUNT_ID),
-            _ => (Beneficiary::LegalOfficer(loc_owner), loc_owner),
-        };
-        Balances::resolve_creating(&target, amount);
-        beneficiary
     }
 }
 
@@ -236,6 +238,9 @@ impl pallet_loc::Config for Test {
     type ValueFeeDistributionKey = ValueFeeDistributionKey;
     type CollectionItemFeeDistributionKey = RecurentFeeDistributionKey;
     type TokensRecordFeeDistributionKey = RecurentFeeDistributionKey;
+    type IdentityLocLegalFeeDistributionKey = IdentityLocLegalFeeDistributionKey;
+    type TransactionLocLegalFeeDistributionKey = OtherLocLegalFeeDistributionKey;
+    type CollectionLocLegalFeeDistributionKey = OtherLocLegalFeeDistributionKey;
 }
 
 // Build genesis storage according to the mock runtime.
