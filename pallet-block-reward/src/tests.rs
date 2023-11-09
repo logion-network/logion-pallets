@@ -22,10 +22,7 @@ pub fn inflation_as_expected() {
 pub fn reward_distributed_as_expected() {
     new_test_ext().execute_with(|| {
         BlockReward::on_finalize(0);
-
-        assert_eq!(get_free_balance(RESERVE_ACCOUNT), 2_000_000_000_000_000_000);
-        assert_eq!(get_free_balance(STAKERS_ACCOUNT), 5_000_000_000_000_000_000);
-        assert_eq!(get_free_balance(COLLATORS_ACCOUNT), 3_000_000_000_000_000_000);
+        assert_eq!(get_free_balance(COMMUNITY_TREASURY_ACCOUNT), 10_000_000_000_000_000_000);
     })
 }
 

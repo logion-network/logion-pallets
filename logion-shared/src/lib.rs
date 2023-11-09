@@ -92,10 +92,9 @@ pub trait LegalOfficerCreation<AccountId> {
 
 #[derive(Debug, PartialEq)]
 pub struct DistributionKey {
-    pub reserve_percent: Percent,
-    pub stakers_percent: Percent,
+    pub community_treasury_percent: Percent,
     pub collators_percent: Percent,
-    pub treasury_percent: Percent,
+    pub logion_treasury_percent: Percent,
     pub loc_owner_percent: Percent,
 }
 
@@ -104,10 +103,9 @@ impl DistributionKey {
     pub fn is_valid(&self) -> bool {
         let mut should_become_zero = Self::into_signed(Percent::one());
 
-        should_become_zero = should_become_zero - Self::into_signed(self.reserve_percent);
-        should_become_zero = should_become_zero - Self::into_signed(self.stakers_percent);
+        should_become_zero = should_become_zero - Self::into_signed(self.community_treasury_percent);
         should_become_zero = should_become_zero - Self::into_signed(self.collators_percent);
-        should_become_zero = should_become_zero - Self::into_signed(self.treasury_percent);
+        should_become_zero = should_become_zero - Self::into_signed(self.logion_treasury_percent);
         should_become_zero = should_become_zero - Self::into_signed(self.loc_owner_percent);
 
         should_become_zero == 0
@@ -126,11 +124,9 @@ pub trait RewardDistributor<I: Imbalance<B>, B: Balance, AccountId: Clone> {
 
     fn payout_collators(reward: I);
 
-    fn payout_reserve(reward: I);
+    fn payout_community_treasury(reward: I);
 
-    fn payout_stakers(reward: I);
-
-    fn payout_treasury(reward: I);
+    fn payout_logion_treasury(reward: I);
 
     fn payout_to(reward: I, account: &AccountId);
 
@@ -145,20 +141,17 @@ pub trait RewardDistributor<I: Imbalance<B>, B: Balance, AccountId: Clone> {
     fn _distribute(amount: I, distribution_key: DistributionKey, loc_owner: Option<&AccountId>) -> (Beneficiary<AccountId>, B)  {
         let amount_balance = amount.peek();
 
-        let stakers_part = distribution_key.stakers_percent * amount_balance;
         let collators_part = distribution_key.collators_percent * amount_balance;
-        let treasury_part = distribution_key.treasury_percent * amount_balance;
+        let logion_treasury_part = distribution_key.logion_treasury_percent * amount_balance;
         let loc_owner_part = distribution_key.loc_owner_percent * amount_balance;
 
-        let (stakers_imbalance, remainder1) = amount.split(stakers_part);
-        let (collators_imbalance, remainder2) = remainder1.split(collators_part);
-        let (loc_owner_imbalance, remainder3) = remainder2.split(loc_owner_part);
-        let (treasury_imbalance, reserve_imbalance) = remainder3.split(treasury_part);
+        let (collators_imbalance, remainder1) = amount.split(collators_part);
+        let (loc_owner_imbalance, remainder2) = remainder1.split(loc_owner_part);
+        let (logion_treasury_imbalance, community_treasury_imbalance) = remainder2.split(logion_treasury_part);
 
-        Self::payout_stakers(stakers_imbalance);
-        Self::payout_reserve(reserve_imbalance);
+        Self::payout_community_treasury(community_treasury_imbalance);
         Self::payout_collators(collators_imbalance);
-        Self::payout_treasury(treasury_imbalance);
+        Self::payout_logion_treasury(logion_treasury_imbalance);
         match loc_owner {
             Some(account) => {
                 if distribution_key.loc_owner_percent != Percent::zero() {
@@ -177,18 +170,8 @@ pub trait RewardDistributor<I: Imbalance<B>, B: Balance, AccountId: Clone> {
 
 }
 
-pub type EuroCent = u32;
-
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
 pub enum Beneficiary<AccountId> {
     Other,
     LegalOfficer(AccountId),
-}
-
-pub trait LegalFee<I: Imbalance<B>, B: Balance, LocType, AccountId> {
-
-    fn get_default_legal_fee(loc_type: LocType) -> EuroCent;
-
-    /// Determine, distribute to, and return the beneficiary of Legal fee.
-    fn distribute(amount: I, loc_type: LocType, loc_owner: AccountId) -> Beneficiary<AccountId>;
 }

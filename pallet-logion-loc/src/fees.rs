@@ -12,10 +12,9 @@ pub struct BalancesSnapshot {
     pub legal_officer_account: AccountId,
     pub payer: Balance,
     pub payer_reserved: Balance,
-    pub treasury: Balance,
-    pub stakers: Balance,
+    pub logion_treasury: Balance,
     pub collators: Balance,
-    pub reserve: Balance,
+    pub community_treasury: Balance,
     pub legal_officer: Balance,
 }
 impl BalancesSnapshot {
@@ -26,10 +25,9 @@ impl BalancesSnapshot {
             legal_officer_account,
             payer: Self::get_free_balance(payer_account),
             payer_reserved: Self::get_reserved_balance(payer_account),
-            treasury: Self::get_free_balance(TREASURY_ACCOUNT_ID),
-            stakers: Self::get_free_balance(STAKERS_ACCOUNT),
+            logion_treasury: Self::get_free_balance(LOGION_TREASURY_ACCOUNT_ID),
             collators: Self::get_free_balance(COLLATORS_ACCOUNT),
-            reserve: Self::get_free_balance(RESERVE_ACCOUNT),
+            community_treasury: Self::get_free_balance(COMMUNITY_TREASURY_ACCOUNT),
             legal_officer: Self::get_free_balance(legal_officer_account),
         }
     }
@@ -46,10 +44,9 @@ impl BalancesSnapshot {
         BalancesDelta {
             payer: previous.payer.saturating_sub(Self::get_free_balance(previous.payer_account)),
             payer_reserved: previous.payer_reserved.saturating_sub(Self::get_reserved_balance(previous.payer_account)),
-            treasury: Self::get_free_balance(TREASURY_ACCOUNT_ID).saturating_sub(previous.treasury),
-            stakers: Self::get_free_balance(STAKERS_ACCOUNT).saturating_sub(previous.stakers),
+            logion_treasury: Self::get_free_balance(LOGION_TREASURY_ACCOUNT_ID).saturating_sub(previous.logion_treasury),
             collators: Self::get_free_balance(COLLATORS_ACCOUNT).saturating_sub(previous.collators),
-            reserve: Self::get_free_balance(RESERVE_ACCOUNT).saturating_sub(previous.reserve),
+            community_treasury: Self::get_free_balance(COMMUNITY_TREASURY_ACCOUNT).saturating_sub(previous.community_treasury),
             legal_officer: Self::get_free_balance(previous.legal_officer_account).saturating_sub(previous.legal_officer),
         }
     }
@@ -59,23 +56,21 @@ impl BalancesSnapshot {
 pub struct BalancesDelta {
     /// Debited amount or 0 if credited
     payer: u128,
-    /// Debited amount from reserve or 0 if credited
+    /// Debited amount from community_treasury or 0 if credited
     payer_reserved: u128,
     /// Credited amount or 0 if debited
-    treasury: u128,
-    /// Credited amount or 0 if debited
-    stakers: u128,
+    logion_treasury: u128,
     /// Credited amount or 0 if debited
     collators: u128,
     /// Credited amount or 0 if debited
-    reserve: u128,
+    community_treasury: u128,
     /// Credited amount or 0 if debited
     legal_officer: u128,
 }
 impl BalancesDelta {
 
     pub fn total_credited(&self) -> u128 {
-        self.treasury + self.stakers + self.collators + self.reserve + self.legal_officer
+        self.logion_treasury + self.collators + self.community_treasury + self.legal_officer
     }
 
     pub fn total_debited(&self) -> u128 {
