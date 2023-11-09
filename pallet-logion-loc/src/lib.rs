@@ -826,6 +826,7 @@ pub mod pallet {
 
                 assert_eq!(loc.collection_item_fee, 0_u32.into());
                 assert_eq!(loc.tokens_record_fee, 0_u32.into());
+                assert!(loc.legal_fee.ge(Balance::zero()));
             });
 
             Ok(())
