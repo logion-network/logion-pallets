@@ -1,5 +1,5 @@
 use frame_support::sp_runtime::Percent;
-use crate::DistributionKey;
+use crate::{DistributionKey, RewardDistributor};
 
 #[test]
 fn distribution_key_with_only_community_treasury_is_valid() {

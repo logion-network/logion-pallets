@@ -131,8 +131,8 @@ for RewardDistributor
         Balances::resolve_creating(&COMMUNITY_TREASURY_ACCOUNT, reward);
     }
 
-    fn payout_collators(reward: NegativeImbalanceOf<Test>) {
-        Balances::resolve_creating(&COLLATORS_ACCOUNT, reward);
+    fn get_collators() -> Vec<AccountId> {
+        vec![COLLATORS_ACCOUNT]
     }
 
     fn payout_logion_treasury(reward: NegativeImbalanceOf<Test>) {
