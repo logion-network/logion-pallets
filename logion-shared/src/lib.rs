@@ -2,9 +2,9 @@
 
 use codec::{Decode, Encode};
 use frame_support::{
-    dispatch::{GetDispatchInfo},
+    dispatch::GetDispatchInfo,
     Parameter,
-    traits::{EnsureOrigin, UnfilteredDispatchable, Imbalance},
+    traits::{EnsureOrigin, Imbalance, UnfilteredDispatchable},
 };
 use frame_support::dispatch::DispatchResultWithPostInfo;
 use frame_support::sp_runtime::Percent;
@@ -13,6 +13,9 @@ use frame_system::{ensure_signed, RawOrigin};
 use scale_info::TypeInfo;
 use sp_std::{boxed::Box, vec::Vec};
 use sp_weights::Weight;
+
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 
 #[cfg(test)]
 mod tests;
@@ -123,9 +126,9 @@ impl DistributionKey {
 pub trait RewardDistributor<I: Imbalance<B>, B: Balance, AccountId: Clone> {
 
     fn payout_collators(reward: I) {
-
         if reward.peek() != B::zero() {
-            let collators = Self::get_collators();
+            let mut collators = Self::get_collators();
+            collators.shuffle(&mut thread_rng());
             let mut remainder = reward;
             let size = collators.len();
             for i in 0..size {

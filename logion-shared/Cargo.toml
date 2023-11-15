@@ -20,6 +20,7 @@ frame-system = { git = "https://github.com/paritytech/polkadot-sdk", default-fea
 scale-info = { version = "2.5.0", default-features = false, features = ["derive"] }
 sp-std = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-v1.1.0" }
 sp-weights = { git = "https://github.com/paritytech/polkadot-sdk", default-features = false, tag = "polkadot-v1.1.0" }
+rand = { version = "0.8.5", features = ["small_rng"] }
 
 [features]
 default = ['std']
