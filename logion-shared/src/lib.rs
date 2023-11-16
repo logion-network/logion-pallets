@@ -122,7 +122,23 @@ impl DistributionKey {
 
 pub trait RewardDistributor<I: Imbalance<B>, B: Balance, AccountId: Clone> {
 
-    fn payout_collators(reward: I);
+    fn payout_collators(reward: I) {
+
+        if reward.peek() != B::zero() {
+            let collators = Self::get_collators();
+            let mut remainder = reward;
+            let size = collators.len();
+            for i in 0..size {
+                let collator = &collators[i];
+                let num_of_remaining_collators = (size - i - 1) as u32;
+                let (amount, new_remainder) = remainder.ration(1, num_of_remaining_collators);
+                Self::payout_to(amount, collator);
+                remainder = new_remainder;
+            }
+        }
+    }
+
+    fn get_collators() -> Vec<AccountId>;
 
     fn payout_community_treasury(reward: I);
 

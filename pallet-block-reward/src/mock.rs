@@ -83,8 +83,12 @@ impl pallet_balances::Config for Test {
 
 // Fake accounts used to simulate reward beneficiaries balances
 pub const COMMUNITY_TREASURY_ACCOUNT: AccountId = 2;
-pub const COLLATORS_ACCOUNT: AccountId = 3;
+pub const COLLATORS_ACCOUNT_1: AccountId = 3;
+pub const COLLATORS_ACCOUNT_2: AccountId = 4;
 pub const LOGION_TREASURY_ACCOUNT: AccountId = 5;
+pub const COLLATORS_ACCOUNT_3: AccountId = 6;
+pub const COLLATORS_ACCOUNT_4: AccountId = 7;
+pub const COLLATORS_ACCOUNT_5: AccountId = 8;
 
 // Type used as beneficiary payout handle
 pub struct RewardDistributorImpl();
@@ -95,16 +99,16 @@ for RewardDistributorImpl
         Balances::resolve_creating(&COMMUNITY_TREASURY_ACCOUNT, reward);
     }
 
-    fn payout_collators(reward: NegativeImbalanceOf<Test>) {
-        Balances::resolve_creating(&COLLATORS_ACCOUNT, reward);
+    fn get_collators() -> Vec<AccountId> {
+        vec![COLLATORS_ACCOUNT_1, COLLATORS_ACCOUNT_2, COLLATORS_ACCOUNT_3, COLLATORS_ACCOUNT_4, COLLATORS_ACCOUNT_5]
     }
 
     fn payout_logion_treasury(reward: NegativeImbalanceOf<Test>) {
         Balances::resolve_creating(&LOGION_TREASURY_ACCOUNT, reward);
     }
 
-    fn payout_to(_reward: NegativeImbalanceOf<Test>, _account: &AccountId) {
-        panic!("Impossible to reward a given account with inflation")
+    fn payout_to(reward: NegativeImbalanceOf<Test>, account: &AccountId) {
+        Balances::resolve_creating(account, reward);
     }
 }
 
@@ -113,9 +117,9 @@ pub const BLOCK_REWARD: Balance = 10_000_000_000_000_000_000; // 10 LGNT
 parameter_types! {
     pub const RewardAmount: Balance = BLOCK_REWARD;
     pub const RewardDistributionKey: DistributionKey = DistributionKey {
-        collators_percent: Percent::from_percent(0),
-        community_treasury_percent: Percent::from_percent(100),
-        logion_treasury_percent: Percent::from_percent(0),
+        collators_percent: Percent::from_percent(35),
+        community_treasury_percent: Percent::from_percent(30),
+        logion_treasury_percent: Percent::from_percent(35),
         loc_owner_percent: Percent::from_percent(0),
     };
 }
