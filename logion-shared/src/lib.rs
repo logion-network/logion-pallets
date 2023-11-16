@@ -130,7 +130,8 @@ pub trait RewardDistributor<I: Imbalance<B>, B: Balance, AccountId: Clone> {
             let size = collators.len();
             for i in 0..size {
                 let collator = &collators[i];
-                let (amount, new_remainder) = remainder.ration(1, (size - i - 1) as u32);
+                let num_of_remaining_collators = (size - i - 1) as u32;
+                let (amount, new_remainder) = remainder.ration(1, num_of_remaining_collators);
                 Self::payout_to(amount, collator);
                 remainder = new_remainder;
             }
