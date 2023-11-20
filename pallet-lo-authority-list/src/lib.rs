@@ -3,7 +3,7 @@
 use codec::{Decode, Encode};
 
 use frame_support::dispatch::DispatchResultWithPostInfo;
-use frame_support::error::BadOrigin;
+use sp_runtime::traits::BadOrigin;
 use frame_support::{
     sp_runtime,
     traits::EnsureOrigin,

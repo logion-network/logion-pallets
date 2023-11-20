@@ -1,7 +1,8 @@
 use crate::{mock::*, LegalOfficerData, Error, HostData, LegalOfficerDataOf, HostDataOf};
-use frame_support::{assert_err, assert_ok, error::BadOrigin};
+use frame_support::{assert_err, assert_ok};
 use logion_shared::IsLegalOfficer;
 use sp_core::OpaquePeerId;
+use sp_runtime::traits::BadOrigin;
 
 const LEGAL_OFFICER_ID: u64 = 1;
 const ANOTHER_ID: u64 = 2;
