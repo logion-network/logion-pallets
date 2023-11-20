@@ -93,7 +93,7 @@ pub trait LegalOfficerCreation<AccountId> {
 #[derive(Debug, PartialEq)]
 pub struct DistributionKey {
     pub community_treasury_percent: Percent,
-    pub collators_percent: Percent,
+    pub legal_officers_percent: Percent,
     pub logion_treasury_percent: Percent,
     pub loc_owner_percent: Percent,
 }
@@ -104,7 +104,7 @@ impl DistributionKey {
         let mut should_become_zero = Self::into_signed(Percent::one());
 
         should_become_zero = should_become_zero - Self::into_signed(self.community_treasury_percent);
-        should_become_zero = should_become_zero - Self::into_signed(self.collators_percent);
+        should_become_zero = should_become_zero - Self::into_signed(self.legal_officers_percent);
         should_become_zero = should_become_zero - Self::into_signed(self.logion_treasury_percent);
         should_become_zero = should_become_zero - Self::into_signed(self.loc_owner_percent);
 
@@ -120,25 +120,28 @@ impl DistributionKey {
     }
 }
 
-pub trait RewardDistributor<I: Imbalance<B>, B: Balance, AccountId: Clone> {
-
-    fn payout_collators(reward: I) {
-
+pub trait RewardDistributor<
+    I: Imbalance<B>,
+    B: Balance,
+    AccountId: Clone + PartialEq,
+    Origin: Clone + Into<Result<RawOrigin<AccountId>, Origin>>,
+    LoAuthorityList: IsLegalOfficer<AccountId, Origin>,
+>
+{
+    fn payout_legal_officers(reward: I) {
         if reward.peek() != B::zero() {
-            let collators = Self::get_collators();
+            let legal_officers = LoAuthorityList::legal_officers();
             let mut remainder = reward;
-            let size = collators.len();
+            let size = legal_officers.len();
             for i in 0..size {
-                let collator = &collators[i];
-                let num_of_remaining_collators = (size - i - 1) as u32;
-                let (amount, new_remainder) = remainder.ration(1, num_of_remaining_collators);
-                Self::payout_to(amount, collator);
+                let legal_officer = &legal_officers[i];
+                let num_of_remaining_legal_officers = (size - i - 1) as u32;
+                let (amount, new_remainder) = remainder.ration(1, num_of_remaining_legal_officers);
+                Self::payout_to(amount, legal_officer);
                 remainder = new_remainder;
             }
         }
     }
-
-    fn get_collators() -> Vec<AccountId>;
 
     fn payout_community_treasury(reward: I);
 
@@ -157,16 +160,16 @@ pub trait RewardDistributor<I: Imbalance<B>, B: Balance, AccountId: Clone> {
     fn _distribute(amount: I, distribution_key: DistributionKey, loc_owner: Option<&AccountId>) -> (Beneficiary<AccountId>, B)  {
         let amount_balance = amount.peek();
 
-        let collators_part = distribution_key.collators_percent * amount_balance;
+        let legal_officers_part = distribution_key.legal_officers_percent * amount_balance;
         let logion_treasury_part = distribution_key.logion_treasury_percent * amount_balance;
         let loc_owner_part = distribution_key.loc_owner_percent * amount_balance;
 
-        let (collators_imbalance, remainder1) = amount.split(collators_part);
+        let (legal_officers_imbalance, remainder1) = amount.split(legal_officers_part);
         let (loc_owner_imbalance, remainder2) = remainder1.split(loc_owner_part);
         let (logion_treasury_imbalance, community_treasury_imbalance) = remainder2.split(logion_treasury_part);
 
         Self::payout_community_treasury(community_treasury_imbalance);
-        Self::payout_collators(collators_imbalance);
+        Self::payout_legal_officers(legal_officers_imbalance);
         Self::payout_logion_treasury(logion_treasury_imbalance);
         match loc_owner {
             Some(account) => {
@@ -178,12 +181,9 @@ pub trait RewardDistributor<I: Imbalance<B>, B: Balance, AccountId: Clone> {
                     (Beneficiary::Other, B::zero())
                 }
             }
-            None => {
-                (Beneficiary::Other, B::zero())
-            }
+            None => (Beneficiary::Other, B::zero()),
         }
     }
-
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]

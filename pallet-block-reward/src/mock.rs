@@ -3,6 +3,8 @@ use crate::{self as pallet_block_reward, NegativeImbalanceOf};
 use frame_support::{
     construct_runtime, parameter_types, traits::Currency,
 };
+use frame_support::traits::EnsureOrigin;
+use frame_system as system;
 
 use sp_core::H256;
 use sp_runtime::{
@@ -12,7 +14,7 @@ use sp_runtime::{
     Percent,
     BuildStorage,
 };
-use logion_shared::{DistributionKey, RewardDistributor};
+use logion_shared::{DistributionKey, IsLegalOfficer, RewardDistributor};
 
 pub type AccountId = u64;
 pub type Balance = u128;
@@ -83,24 +85,20 @@ impl pallet_balances::Config for Test {
 
 // Fake accounts used to simulate reward beneficiaries balances
 pub const COMMUNITY_TREASURY_ACCOUNT: AccountId = 2;
-pub const COLLATORS_ACCOUNT_1: AccountId = 3;
-pub const COLLATORS_ACCOUNT_2: AccountId = 4;
+pub const LEGAL_OFFICER_ACCOUNT_1: AccountId = 3;
+pub const LEGAL_OFFICER_ACCOUNT_2: AccountId = 4;
 pub const LOGION_TREASURY_ACCOUNT: AccountId = 5;
-pub const COLLATORS_ACCOUNT_3: AccountId = 6;
-pub const COLLATORS_ACCOUNT_4: AccountId = 7;
-pub const COLLATORS_ACCOUNT_5: AccountId = 8;
+pub const LEGAL_OFFICER_ACCOUNT_3: AccountId = 6;
+pub const LEGAL_OFFICER_ACCOUNT_4: AccountId = 7;
+pub const LEGAL_OFFICER_ACCOUNT_5: AccountId = 8;
 
 // Type used as beneficiary payout handle
 pub struct RewardDistributorImpl();
-impl RewardDistributor<NegativeImbalanceOf<Test>, Balance, AccountId>
+impl RewardDistributor<NegativeImbalanceOf<Test>, Balance, AccountId, RuntimeOrigin, LoAuthorityListMock>
 for RewardDistributorImpl
 {
     fn payout_community_treasury(reward: NegativeImbalanceOf<Test>) {
         Balances::resolve_creating(&COMMUNITY_TREASURY_ACCOUNT, reward);
-    }
-
-    fn get_collators() -> Vec<AccountId> {
-        vec![COLLATORS_ACCOUNT_1, COLLATORS_ACCOUNT_2, COLLATORS_ACCOUNT_3, COLLATORS_ACCOUNT_4, COLLATORS_ACCOUNT_5]
     }
 
     fn payout_logion_treasury(reward: NegativeImbalanceOf<Test>) {
@@ -117,11 +115,27 @@ pub const BLOCK_REWARD: Balance = 10_000_000_000_000_000_000; // 10 LGNT
 parameter_types! {
     pub const RewardAmount: Balance = BLOCK_REWARD;
     pub const RewardDistributionKey: DistributionKey = DistributionKey {
-        collators_percent: Percent::from_percent(35),
+        legal_officers_percent: Percent::from_percent(35),
         community_treasury_percent: Percent::from_percent(30),
         logion_treasury_percent: Percent::from_percent(35),
         loc_owner_percent: Percent::from_percent(0),
     };
+}
+
+pub struct LoAuthorityListMock;
+impl EnsureOrigin<RuntimeOrigin> for LoAuthorityListMock {
+    type Success = <Test as system::Config>::AccountId;
+
+    fn try_origin(o: <Test as system::Config>::RuntimeOrigin) -> Result<Self::Success, <Test as system::Config>::RuntimeOrigin> {
+        <Self as IsLegalOfficer<<Test as system::Config>::AccountId, <Test as system::Config>::RuntimeOrigin>>::try_origin(o)
+    }
+}
+
+impl IsLegalOfficer<<Test as system::Config>::AccountId, RuntimeOrigin> for LoAuthorityListMock {
+
+    fn legal_officers() -> Vec<<Test as system::Config>::AccountId> {
+        vec![LEGAL_OFFICER_ACCOUNT_1, LEGAL_OFFICER_ACCOUNT_2, LEGAL_OFFICER_ACCOUNT_3, LEGAL_OFFICER_ACCOUNT_4, LEGAL_OFFICER_ACCOUNT_5]
+    }
 }
 
 impl pallet_block_reward::Config for Test {
@@ -129,6 +143,7 @@ impl pallet_block_reward::Config for Test {
     type RewardAmount = RewardAmount;
     type RewardDistributor = RewardDistributorImpl;
     type DistributionKey = RewardDistributionKey;
+    type IsLegalOfficer = LoAuthorityListMock;
 }
 
 pub fn new_test_ext() -> sp_io::TestExternalities {

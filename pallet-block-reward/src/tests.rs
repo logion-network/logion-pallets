@@ -22,11 +22,11 @@ pub fn inflation_as_expected() {
 pub fn reward_distributed_as_expected() {
     new_test_ext().execute_with(|| {
         BlockReward::on_finalize(0);
-        assert_eq!(get_free_balance(COLLATORS_ACCOUNT_1), 700_000_000_000_000_000);
-        assert_eq!(get_free_balance(COLLATORS_ACCOUNT_2), 700_000_000_000_000_000);
-        assert_eq!(get_free_balance(COLLATORS_ACCOUNT_3), 700_000_000_000_000_000);
-        assert_eq!(get_free_balance(COLLATORS_ACCOUNT_4), 700_000_000_000_000_000);
-        assert_eq!(get_free_balance(COLLATORS_ACCOUNT_5), 700_000_000_000_000_000);
+        assert_eq!(get_free_balance(LEGAL_OFFICER_ACCOUNT_1), 700_000_000_000_000_000);
+        assert_eq!(get_free_balance(LEGAL_OFFICER_ACCOUNT_2), 700_000_000_000_000_000);
+        assert_eq!(get_free_balance(LEGAL_OFFICER_ACCOUNT_3), 700_000_000_000_000_000);
+        assert_eq!(get_free_balance(LEGAL_OFFICER_ACCOUNT_4), 700_000_000_000_000_000);
+        assert_eq!(get_free_balance(LEGAL_OFFICER_ACCOUNT_5), 700_000_000_000_000_000);
         assert_eq!(get_free_balance(COMMUNITY_TREASURY_ACCOUNT), 3_000_000_000_000_000_000);
         assert_eq!(get_free_balance(LOGION_TREASURY_ACCOUNT), 3_500_000_000_000_000_000);
     })
