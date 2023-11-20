@@ -73,10 +73,11 @@ impl pallet_balances::Config for Test {
     type DustRemoval = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
-    type FreezeIdentifier = [u8; 8];
+    type FreezeIdentifier = ();
     type MaxFreezes = MaxFreezes;
     type MaxHolds = MaxHolds;
-    type RuntimeHoldReason = [u8; 8];
+    type RuntimeHoldReason = ();
+    type RuntimeFreezeReason = ();
     type WeightInfo = ();
 }
 
