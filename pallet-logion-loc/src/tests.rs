@@ -37,7 +37,7 @@ const OTHER_LOC_DEFAULT_LEGAL_FEE: Balance = EXCHANGE_RATE * 100_00;
 fn it_creates_loc_with_default_legal_fee() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, OTHER_LOC_DEFAULT_LEGAL_FEE, ItemsParams::empty()));
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: LOC_OWNER1,
@@ -83,7 +83,7 @@ fn set_balance(account_id: AccountId, amount: Balance) {
 fn it_creates_loc_with_custom_legal_fee() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         let custom_legal_fee = 1000 * ONE_LGNT;
         assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, custom_legal_fee, ItemsParams::empty()));
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
@@ -462,7 +462,7 @@ fn it_adds_file_when_caller_owner_and_submitter_is_owner() {
             submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
             size: FILE_SIZE,
         };
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::add_file(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, file.clone()));
         let loc = LogionLoc::loc(LOC_ID).unwrap();
         assert_eq!(loc.files[0], expected_file(&file, ACKNOWLEDGED, NOT_ACKNOWLEDGED));
@@ -494,7 +494,7 @@ fn it_adds_file_when_caller_is_requester_and_submitter_is_requester() {
             submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
             size: FILE_SIZE,
         };
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::add_file(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, file.clone()));
         let loc = LogionLoc::loc(LOC_ID).unwrap();
         assert_eq!(loc.files[0], expected_file(&file, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
@@ -514,7 +514,7 @@ fn it_adds_file_when_caller_is_requester() {
             submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
             size: FILE_SIZE,
         };
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::add_file(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, file.clone()));
         let loc = LogionLoc::loc(LOC_ID).unwrap();
         assert_eq!(loc.files[0], expected_file(&file, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
@@ -680,14 +680,17 @@ fn it_fails_adding_file_when_insufficient_funds() {
             submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
             size: FILE_SIZE,
         };
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_err!(LogionLoc::add_file(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, file.clone()), Error::<Test>::InsufficientFunds);
         check_no_fees(snapshot);
     });
 }
 
 fn check_no_fees(previous_balances: BalancesSnapshot) {
-    let current_balances = BalancesSnapshot::take(previous_balances.payer_account, previous_balances.legal_officer_account);
+    let current_balances = BalancesSnapshot::take(
+        previous_balances.payer_account,
+        previous_balances.legal_officers.iter().map(|legal_officer|{ legal_officer.0 }).collect()
+    );
     let balances_delta = current_balances.delta_since(&previous_balances);
 
     assert_eq!(balances_delta.total_credited(), 0);
@@ -1103,7 +1106,7 @@ fn it_detects_loc_with_wrong_owner_as_invalid() {
 fn it_creates_logion_identity_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        let snapshot = BalancesSnapshot::take(LOC_OWNER1, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_OWNER1, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::create_logion_identity_loc(RuntimeOrigin::signed(LOC_OWNER1), LOGION_IDENTITY_LOC_ID));
 
         assert!(LogionLoc::loc(LOGION_IDENTITY_LOC_ID).is_some());
@@ -1117,7 +1120,7 @@ fn it_creates_logion_identity_loc() {
 fn it_creates_and_links_logion_locs_to_identity_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        let snapshot = BalancesSnapshot::take(LOC_OWNER1, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_OWNER1, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::create_logion_identity_loc(RuntimeOrigin::signed(LOC_OWNER1), LOGION_IDENTITY_LOC_ID));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOGION_IDENTITY_LOC_ID, None, false));
 
@@ -1193,7 +1196,7 @@ fn it_fails_creating_logion_loc_with_closed_void_logion_identity_loc() {
 fn it_creates_collection_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, OTHER_LOC_DEFAULT_LEGAL_FEE, 0, 0, ItemsParams::empty()));
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: LOC_OWNER1,
@@ -1473,7 +1476,7 @@ fn it_adds_item_with_one_file_attached() {
             hash: BlakeTwo256::hash_of(&"file content".as_bytes().to_vec()),
             size: FILE_SIZE,
         }];
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description, collection_item_files, None, false, Vec::new()));
         let fees = Fees::only_storage(1, FILE_SIZE);
         fees.assert_balances_events(snapshot);
@@ -1496,7 +1499,7 @@ fn it_fails_adding_item_with_insufficient_balance() {
             hash: BlakeTwo256::hash_of(&"file content".as_bytes().to_vec()),
             size: FILE_SIZE,
         }];
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_err!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description, collection_item_files, None, false, Vec::new()), Error::<Test>::InsufficientFunds);
         check_no_fees(snapshot);
     });
@@ -1522,7 +1525,7 @@ fn it_adds_item_with_token() {
             token_id: sha256(&"{\"contract\":\"0x765df6da33c1ec1f83be42db171d7ee334a46df5\",\"token\":\"4391\"}".as_bytes().to_vec()),
             token_issuance: 2,
         };
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description, collection_item_files.clone(), Some(collection_item_token), true, Vec::new()));
         let fees = Fees {
             storage_fees: Fees::storage_fees(1, collection_item_files[0].size),
@@ -1598,7 +1601,7 @@ fn it_adds_item_with_two_files_attached() {
                 size: 789,
             },
         ];
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description, collection_item_files, None, false, Vec::new()));
 
         let fees = Fees::only_storage(2, 123456 + 789);
@@ -1659,7 +1662,7 @@ fn it_fails_adding_file_with_same_hash() {
             submitter: SupportedAccountId::Polkadot(LOC_OWNER1),
             size: FILE_SIZE,
         };
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::add_file(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, file1.clone()));
         let file2 = FileParams {
             hash: sha256(&"test".as_bytes().to_vec()),
@@ -1936,7 +1939,7 @@ fn it_adds_tokens_record(submitter: AccountId) {
         let record_description = build_record_description();
         let record_files = build_record_files(1);
 
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(submitter), LOC_ID, record_id, record_description.clone(), record_files.clone()));
 
         let record = LogionLoc::tokens_records(LOC_ID, record_id).unwrap();
@@ -1999,7 +2002,7 @@ fn it_fails_adding_tokens_record_already_exists() {
         let record_description = build_record_description();
         let record_files = build_record_files(1);
 
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description.clone(), record_files.clone()));
         assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files.clone()), Error::<Test>::TokensRecordAlreadyExists);
         let file = record_files.get(0).unwrap();
@@ -2123,7 +2126,7 @@ fn it_fails_adding_tokens_record_when_insufficient_funds() {
         let record_description = build_record_description();
         let record_files = build_record_files(1);
 
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files), Error::<Test>::InsufficientFunds);
         check_no_fees(snapshot);
     });
@@ -2146,7 +2149,7 @@ fn it_adds_file_on_polkadot_transaction_loc_when_caller_is_requester_and_submitt
             submitter: SupportedAccountId::Polkadot(ISSUER_ID1),
             size: FILE_SIZE,
         };
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::add_file(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, file.clone()));
         let loc = LogionLoc::loc(LOC_ID).unwrap();
         assert_eq!(loc.files[0], expected_file(&file, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
@@ -2270,7 +2273,7 @@ fn it_creates_ethereum_identity_loc() {
         let sponsorship_id = 1;
         let sponsored_account = SupportedAccountId::Other(OtherAccountId::Ethereum(ethereum_address));
         assert_ok!(LogionLoc::sponsor(RuntimeOrigin::signed(SPONSOR_ID), sponsorship_id, sponsored_account, LOC_OWNER1));
-        let snapshot = BalancesSnapshot::take(SPONSOR_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(SPONSOR_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::create_other_identity_loc(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, requester_account_id.clone(), sponsorship_id, ID_LOC_DEFAULT_LEGAL_FEE));
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: LOC_OWNER1,
@@ -2305,7 +2308,7 @@ fn it_creates_ethereum_identity_loc() {
 fn it_creates_polkadot_identity_loc() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, ID_LOC_DEFAULT_LEGAL_FEE, ItemsParams::empty()));
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: LOC_OWNER1,
@@ -2414,7 +2417,7 @@ fn it_adds_file_when_submitter_is_ethereum_requester() {
             submitter: SupportedAccountId::Other(OtherAccountId::Ethereum(requester)),
             size: FILE_SIZE,
         };
-        let snapshot = BalancesSnapshot::take(SPONSOR_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(SPONSOR_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::add_file(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, file.clone()));
         let loc = LogionLoc::loc(LOC_ID).unwrap();
         assert_eq!(loc.files[0], expected_file(&file, ACKNOWLEDGED, NOT_ACKNOWLEDGED));
@@ -2488,7 +2491,7 @@ fn it_captures_value_fees() {
         setup_default_balances();
         let value_fee = 100;
         assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, value_fee, OTHER_LOC_DEFAULT_LEGAL_FEE, 0, 0, ItemsParams::empty()));
-        let previous_balances = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let previous_balances = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, None, false));
 
         let fees = Fees {
@@ -3069,7 +3072,7 @@ fn it_fails_creating_collection_loc_with_invalid_link_submitter() {
 fn it_applies_storage_fees_on_transaction_creation() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         let file = FileParams {
             hash: sha256(&"test".as_bytes().to_vec()),
             nature: sha256(&"Test".as_bytes().to_vec()),
@@ -3086,7 +3089,7 @@ fn it_applies_storage_fees_on_transaction_creation() {
 fn it_applies_storage_fees_on_identity_creation() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         let file = FileParams {
             hash: sha256(&"test".as_bytes().to_vec()),
             nature: sha256(&"Test".as_bytes().to_vec()),
@@ -3103,7 +3106,7 @@ fn it_applies_storage_fees_on_identity_creation() {
 fn it_applies_storage_fees_on_collection_creation() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         let file = FileParams {
             hash: sha256(&"test".as_bytes().to_vec()),
             nature: sha256(&"Test".as_bytes().to_vec()),
@@ -3124,7 +3127,7 @@ fn it_applies_collection_item_fee() {
         assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, LOC_OWNER1, None, Some(10), false, 0, OTHER_LOC_DEFAULT_LEGAL_FEE, collection_item_fee, 0, ItemsParams::empty()));
         assert_ok!(LogionLoc::close(RuntimeOrigin::signed(LOC_OWNER1), LOC_ID, None, false));
 
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LOC_OWNER1);
+        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, LEGAL_OFFICERS.to_vec());
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
         let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
         assert_ok!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], None, false, Vec::new()));

@@ -550,7 +550,7 @@ pub mod pallet {
         type FileStorageEntryFee: Get<BalanceOf<Self>>;
 
         /// Used to payout fees
-        type RewardDistributor: RewardDistributor<NegativeImbalanceOf<Self>, BalanceOf<Self>, Self::AccountId>;
+        type RewardDistributor: RewardDistributor<NegativeImbalanceOf<Self>, BalanceOf<Self>, Self::AccountId, Self::RuntimeOrigin, Self::IsLegalOfficer>;
 
         /// Used to compute storage fees rewards
         type FileStorageFeeDistributionKey: Get<DistributionKey>;

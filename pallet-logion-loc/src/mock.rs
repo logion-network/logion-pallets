@@ -75,13 +75,15 @@ impl pallet_balances::Config for Test {
     type AccountStore = System;
     type FreezeIdentifier = [u8; 8];
     type MaxFreezes = MaxFreezes;
-	type MaxHolds = MaxHolds;
+    type MaxHolds = MaxHolds;
     type RuntimeHoldReason = [u8; 8];
     type WeightInfo = ();
 }
 
 pub const LOC_OWNER1: u64 = 1;
 pub const LOC_OWNER2: u64 = 2;
+// This Legal Officer is not owner of any LOC but still is credited some reward via RewardDistributor::payout_legal_officers
+pub const OTHER_LEGAL_OFFICER_ACCOUNT: AccountId = 21;
 pub const LOC_REQUESTER_ID: u64 = 3;
 pub const LOC_REQUESTER: RequesterOf<Test> = RequesterOf::<Test>::Account(LOC_REQUESTER_ID);
 pub const LOGION_IDENTITY_LOC_ID: u32 = 4;
@@ -90,7 +92,7 @@ pub const ISSUER_ID2: u64 = 6;
 pub const SPONSOR_ID: u64 = 7;
 pub const LOGION_TREASURY_ACCOUNT_ID: u64 = 8;
 pub const UNAUTHORIZED_CALLER: u64 = 9;
-
+pub const LEGAL_OFFICERS: [AccountId; 3] = [LOC_OWNER1, LOC_OWNER2, OTHER_LEGAL_OFFICER_ACCOUNT];
 pub struct LoAuthorityListMock;
 impl EnsureOrigin<RuntimeOrigin> for LoAuthorityListMock {
     type Success = <Test as system::Config>::AccountId;
@@ -101,9 +103,8 @@ impl EnsureOrigin<RuntimeOrigin> for LoAuthorityListMock {
 }
 
 impl IsLegalOfficer<<Test as system::Config>::AccountId, RuntimeOrigin> for LoAuthorityListMock {
-
     fn legal_officers() -> Vec<<Test as system::Config>::AccountId> {
-        vec![ LOC_OWNER1, LOC_OWNER2 ]
+        LEGAL_OFFICERS.to_vec()
     }
 }
 
@@ -120,19 +121,14 @@ parameter_types! {
 
 // Fake accounts used to simulate reward beneficiaries balances
 pub const COMMUNITY_TREASURY_ACCOUNT: AccountId = 20;
-pub const COLLATORS_ACCOUNT: AccountId = 21;
 
 // Type used as beneficiary payout handle
 pub struct RewardDistributor;
-impl logion_shared::RewardDistributor<NegativeImbalanceOf<Test>, Balance, AccountId>
+impl logion_shared::RewardDistributor<NegativeImbalanceOf<Test>, Balance, AccountId, RuntimeOrigin, LoAuthorityListMock>
 for RewardDistributor
 {
     fn payout_community_treasury(reward: NegativeImbalanceOf<Test>) {
         Balances::resolve_creating(&COMMUNITY_TREASURY_ACCOUNT, reward);
-    }
-
-    fn get_collators() -> Vec<AccountId> {
-        vec![COLLATORS_ACCOUNT]
     }
 
     fn payout_logion_treasury(reward: NegativeImbalanceOf<Test>) {
@@ -148,7 +144,7 @@ parameter_types! {
     pub const FileStorageByteFee: u32 = 10u32;
     pub const FileStorageEntryFee: u32 = 100u32;
     pub const FileStorageFeeDistributionKey: DistributionKey = DistributionKey {
-        collators_percent: Percent::from_percent(80),
+        legal_officers_percent: Percent::from_percent(80),
         community_treasury_percent: Percent::from_percent(20),
         logion_treasury_percent: Percent::from_percent(0),
         loc_owner_percent: Percent::from_percent(0),
@@ -156,31 +152,31 @@ parameter_types! {
     pub const LogionTreasuryAccountId: u64 = LOGION_TREASURY_ACCOUNT_ID;
     pub const CertificateFee: u64 = 4_000_000_000_000_000; // 0.004 LGNT
     pub const CertificateFeeDistributionKey: DistributionKey = DistributionKey {
-        collators_percent: Percent::from_percent(20),
+        legal_officers_percent: Percent::from_percent(20),
         community_treasury_percent: Percent::from_percent(80),
         logion_treasury_percent: Percent::from_percent(0),
         loc_owner_percent: Percent::from_percent(0),
     };
     pub const ValueFeeDistributionKey: DistributionKey = DistributionKey {
-        collators_percent: Percent::from_percent(0),
+        legal_officers_percent: Percent::from_percent(0),
         community_treasury_percent: Percent::from_percent(0),
         logion_treasury_percent: Percent::from_percent(100),
         loc_owner_percent: Percent::from_percent(0),
     };
     pub const RecurentFeeDistributionKey: DistributionKey = DistributionKey {
-        collators_percent: Percent::from_percent(0),
+        legal_officers_percent: Percent::from_percent(0),
         community_treasury_percent: Percent::from_percent(0),
         logion_treasury_percent: Percent::from_percent(95),
         loc_owner_percent: Percent::from_percent(5),
     };
     pub const IdentityLocLegalFeeDistributionKey: DistributionKey = DistributionKey {
-        collators_percent: Percent::from_percent(0),
+        legal_officers_percent: Percent::from_percent(0),
         community_treasury_percent: Percent::from_percent(0),
         logion_treasury_percent: Percent::from_percent(100),
         loc_owner_percent: Percent::from_percent(0),
     };
     pub const OtherLocLegalFeeDistributionKey: DistributionKey = DistributionKey {
-        collators_percent: Percent::from_percent(0),
+        legal_officers_percent: Percent::from_percent(0),
         community_treasury_percent: Percent::from_percent(0),
         logion_treasury_percent: Percent::from_percent(0),
         loc_owner_percent: Percent::from_percent(100),
@@ -189,7 +185,6 @@ parameter_types! {
 
 pub struct SHA256;
 impl Hasher<H256> for SHA256 {
-
     fn hash(data: &Vec<u8>) -> H256 {
         let bytes = sha2_256(data);
         H256(bytes)

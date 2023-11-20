@@ -16,7 +16,7 @@ mod tests;
 
 #[frame_support::pallet]
 pub mod pallet {
-    use logion_shared::{DistributionKey, RewardDistributor};
+    use logion_shared::{DistributionKey, IsLegalOfficer, RewardDistributor};
     use super::*;
 
     #[pallet::pallet]
@@ -34,8 +34,11 @@ pub mod pallet {
         /// The currency trait.
         type Currency: Currency<Self::AccountId>;
 
+        /// Query for getting the list of legal officers
+        type IsLegalOfficer: IsLegalOfficer<Self::AccountId, Self::RuntimeOrigin>;
+
         /// Used to payout rewards
-        type RewardDistributor: RewardDistributor<NegativeImbalanceOf<Self>, BalanceOf<Self>, Self::AccountId>;
+        type RewardDistributor: RewardDistributor<NegativeImbalanceOf<Self>, BalanceOf<Self>, Self::AccountId,  Self::RuntimeOrigin, Self::IsLegalOfficer>;
 
         /// The amount of issuance for each block.
         #[pallet::constant]
