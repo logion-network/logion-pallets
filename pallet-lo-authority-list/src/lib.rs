@@ -402,12 +402,12 @@ impl<T: Config> EnsureOrigin<T::RuntimeOrigin> for Pallet<T> {
     }
 
     #[cfg(feature = "runtime-benchmarks")]
-    fn successful_origin() -> OuterOrigin<T> {
+    fn try_successful_origin() -> Result<<T as frame_system::Config>::RuntimeOrigin, ()> {
         let first_member = match <LegalOfficerSet<T>>::iter().next() {
             Some(pair) => pair.0.clone(),
-            None => Default::default(),
+            None => Err(())?,
         };
-        OuterOrigin::<T>::from(RawOrigin::Signed(first_member.clone()))
+        Ok(OuterOrigin::<T>::from(RawOrigin::Signed(first_member.clone())))
     }
 }
 
