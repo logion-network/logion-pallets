@@ -1,5 +1,15 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
+pub mod migrations;
+
+#[cfg(test)]
+mod mock;
+#[cfg(test)]
+mod tests;
+
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+
 use codec::{Decode, Encode};
 
 use frame_support::dispatch::DispatchResultWithPostInfo;
@@ -22,14 +32,6 @@ use sp_std::{
 };
 
 pub use pallet::*;
-
-pub mod migrations;
-
-#[cfg(test)]
-mod mock;
-
-#[cfg(test)]
-mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 use frame_system::RawOrigin;
