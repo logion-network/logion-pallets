@@ -1,6 +1,7 @@
 use crate::{self as pallet_loc, NegativeImbalanceOf, RequesterOf, Hasher};
 use logion_shared::{DistributionKey, IsLegalOfficer};
 use sp_core::hash::H256;
+use frame_benchmarking::account;
 use frame_support::{construct_runtime, parameter_types, traits::{EnsureOrigin, Currency}};
 use sp_io::hashing::sha2_256;
 use sp_runtime::{traits::{BlakeTwo256, IdentityLookup}, testing::Header, Percent, generic, BuildStorage};
@@ -81,10 +82,6 @@ impl pallet_balances::Config for Test {
     type WeightInfo = ();
 }
 
-pub const LOC_OWNER1: u64 = 1;
-pub const LOC_OWNER2: u64 = 2;
-// This Legal Officer is not owner of any LOC but still is credited some reward via RewardDistributor::payout_legal_officers
-pub const OTHER_LEGAL_OFFICER_ACCOUNT: AccountId = 21;
 pub const LOC_REQUESTER_ID: u64 = 3;
 pub const LOC_REQUESTER: RequesterOf<Test> = RequesterOf::<Test>::Account(LOC_REQUESTER_ID);
 pub const LOGION_IDENTITY_LOC_ID: u32 = 4;
@@ -93,7 +90,12 @@ pub const ISSUER_ID2: u64 = 6;
 pub const SPONSOR_ID: u64 = 7;
 pub const LOGION_TREASURY_ACCOUNT_ID: u64 = 8;
 pub const UNAUTHORIZED_CALLER: u64 = 9;
-pub const LEGAL_OFFICERS: [AccountId; 3] = [LOC_OWNER1, LOC_OWNER2, OTHER_LEGAL_OFFICER_ACCOUNT];
+
+#[cfg(feature = "runtime-benchmarks")]
+pub type OuterOrigin<T> = <T as frame_system::Config>::RuntimeOrigin;
+#[cfg(feature = "runtime-benchmarks")]
+use frame_system::RawOrigin;
+
 pub struct LoAuthorityListMock;
 impl EnsureOrigin<RuntimeOrigin> for LoAuthorityListMock {
     type Success = <Test as system::Config>::AccountId;
@@ -101,11 +103,24 @@ impl EnsureOrigin<RuntimeOrigin> for LoAuthorityListMock {
     fn try_origin(o: <Test as system::Config>::RuntimeOrigin) -> Result<Self::Success, <Test as system::Config>::RuntimeOrigin> {
         <Self as IsLegalOfficer<<Test as system::Config>::AccountId, <Test as system::Config>::RuntimeOrigin>>::try_origin(o)
     }
+
+	#[cfg(feature = "runtime-benchmarks")]
+    fn try_successful_origin() -> Result<<Test as frame_system::Config>::RuntimeOrigin, ()> {
+        Ok(OuterOrigin::<Test>::from(RawOrigin::Signed(legal_officer_id(1).clone())))
+    }
+}
+
+pub fn legal_officer_id(index: u32) -> AccountId {
+	account("owner", index, 0)
+}
+
+pub fn legal_officers() -> Vec<AccountId> {
+	[1, 2, 3].map(legal_officer_id).to_vec()
 }
 
 impl IsLegalOfficer<<Test as system::Config>::AccountId, RuntimeOrigin> for LoAuthorityListMock {
     fn legal_officers() -> Vec<<Test as system::Config>::AccountId> {
-        LEGAL_OFFICERS.to_vec()
+        legal_officers()
     }
 }
 
@@ -224,6 +239,16 @@ impl pallet_loc::Config for Test {
     type IdentityLocLegalFeeDistributionKey = IdentityLocLegalFeeDistributionKey;
     type TransactionLocLegalFeeDistributionKey = OtherLocLegalFeeDistributionKey;
     type CollectionLocLegalFeeDistributionKey = OtherLocLegalFeeDistributionKey;
+	#[cfg(feature = "runtime-benchmarks")]
+	type LocIdFactory = ();
+	#[cfg(feature = "runtime-benchmarks")]
+	type CollectionItemIdFactory = ();
+	#[cfg(feature = "runtime-benchmarks")]
+	type TokensRecordIdFactory = ();
+	#[cfg(feature = "runtime-benchmarks")]
+	type EthereumAddressFactory = ();
+	#[cfg(feature = "runtime-benchmarks")]
+	type SponsorshipIdFactory = ();
 }
 
 // Build genesis storage according to the mock runtime.

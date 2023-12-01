@@ -14,7 +14,6 @@ mod fees;
 #[cfg(test)]
 mod tests;
 
-#[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
 use codec::{Decode, Encode};
@@ -28,6 +27,8 @@ use scale_info::TypeInfo;
 use logion_shared::LegalOfficerCaseSummary;
 use crate::Requester::Account;
 use frame_system::pallet_prelude::BlockNumberFor;
+#[cfg(feature = "runtime-benchmarks")]
+use sp_core::H160;
 use sp_std::{
     collections::btree_set::BTreeSet,
     vec::Vec,
@@ -63,6 +64,12 @@ pub struct MetadataItemParams<AccountId, EthereumAddress, Hash> {
     submitter: SupportedAccountId<AccountId, EthereumAddress>,
 }
 
+pub type MetadataItemParamsOf<T> = MetadataItemParams<
+	<T as frame_system::Config>::AccountId,
+	<T as pallet::Config>::EthereumAddress,
+	<T as pallet::Config>::Hash,
+>;
+
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct LocLink<LocId, Hash, AccountId, EthereumAddress> {
     id: LocId,
@@ -78,6 +85,13 @@ pub struct LocLinkParams<LocId, Hash, AccountId, EthereumAddress> {
     nature: Hash,
     submitter: SupportedAccountId<AccountId, EthereumAddress>,
 }
+
+pub type LocLinkParamsOf<T> = LocLinkParams<
+	<T as pallet::Config>::LocId,
+	<T as pallet::Config>::Hash,
+	<T as frame_system::Config>::AccountId,
+	<T as pallet::Config>::EthereumAddress,
+>;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct File<Hash, AccountId, EthereumAddress> {
@@ -96,6 +110,12 @@ pub struct FileParams<Hash, AccountId, EthereumAddress> {
     submitter: SupportedAccountId<AccountId, EthereumAddress>,
     size: u32,
 }
+
+pub type FileParamsOf<T> = FileParams<
+	<T as pallet::Config>::Hash,
+	<T as frame_system::Config>::AccountId,
+	<T as pallet::Config>::EthereumAddress,
+>;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct ItemsParams<LocId, AccountId, EthereumAddress, Hash> {
@@ -493,6 +513,79 @@ pub mod pallet {
     use super::*;
     pub use crate::weights::WeightInfo;
 
+	#[cfg(feature = "runtime-benchmarks")]
+	use sp_io::hashing::sha2_256;
+	#[cfg(feature = "runtime-benchmarks")]
+	use sp_core::hash::H256;
+
+	#[cfg(feature = "runtime-benchmarks")]
+	pub trait LocIdFactory<LocId> {
+
+		fn loc_id(id: u32) -> LocId;
+	}
+	#[cfg(feature = "runtime-benchmarks")]
+	impl<LocId: From<u32>> LocIdFactory<LocId> for () {
+
+		fn loc_id(id: u32) -> LocId {
+			id.into()
+		}
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	pub trait CollectionItemIdFactory<CollectionItemId> {
+
+		fn collection_item_id(id: u8) -> CollectionItemId;
+	}
+	#[cfg(feature = "runtime-benchmarks")]
+	impl CollectionItemIdFactory<H256> for () {
+
+		fn collection_item_id(id: u8) -> H256 {
+			let bytes = sha2_256(&[id]);
+        	H256(bytes)
+		}
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	pub trait TokensRecordIdFactory<TokensRecordId> {
+
+		fn tokens_record_id(id: u8) -> TokensRecordId;
+	}
+	#[cfg(feature = "runtime-benchmarks")]
+	impl TokensRecordIdFactory<H256> for () {
+
+		fn tokens_record_id(id: u8) -> H256 {
+			let bytes = sha2_256(&[id]);
+        	H256(bytes)
+		}
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	pub trait EthereumAddressFactory<EthereumAddress> {
+
+		fn address(id: u8) -> EthereumAddress;
+	}
+	#[cfg(feature = "runtime-benchmarks")]
+	impl EthereumAddressFactory<H160> for () {
+
+		fn address(id: u8) -> H160 {
+			let bytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, id];
+			H160(bytes)
+		}
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	pub trait SponsorshipIdFactory<SponsorshipId> {
+
+		fn sponsorship_id(id: u32) -> SponsorshipId;
+	}
+	#[cfg(feature = "runtime-benchmarks")]
+	impl<SponsorshipId: From<u32>> SponsorshipIdFactory<SponsorshipId> for () {
+
+		fn sponsorship_id(id: u32) -> SponsorshipId {
+			id.into()
+		}
+	}
+
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// LOC identifier
@@ -587,6 +680,26 @@ pub mod pallet {
 
         /// Used to payout legal fees of a Collection LOC
         type CollectionLocLegalFeeDistributionKey: Get<DistributionKey>;
+
+		/// Loc ID factory for benchmark
+		#[cfg(feature = "runtime-benchmarks")]
+		type LocIdFactory: LocIdFactory<Self::LocId>;
+
+		/// Collection Item ID factory for benchmark
+		#[cfg(feature = "runtime-benchmarks")]
+		type CollectionItemIdFactory: CollectionItemIdFactory<Self::CollectionItemId>;
+
+		/// Tokens Record ID factory for benchmark
+		#[cfg(feature = "runtime-benchmarks")]
+		type TokensRecordIdFactory: TokensRecordIdFactory<Self::TokensRecordId>;
+
+		/// Ethereum address factory for benchmark
+		#[cfg(feature = "runtime-benchmarks")]
+		type EthereumAddressFactory: EthereumAddressFactory<Self::EthereumAddress>;
+
+		/// Sponsorship ID factory for benchmark
+		#[cfg(feature = "runtime-benchmarks")]
+		type SponsorshipIdFactory: SponsorshipIdFactory<Self::SponsorshipId>;
     }
 
     #[pallet::pallet]
