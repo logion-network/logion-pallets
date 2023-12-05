@@ -10,9 +10,69 @@ use frame_system::RawOrigin;
 
 use logion_shared::IsLegalOfficer;
 
-use sp_core::Get;
+use sp_core::{Get, hash::H256};
+use sp_io::hashing::sha2_256;
 use sp_runtime::traits::Bounded;
 use sp_std::vec;
+
+
+pub trait LocIdFactory<LocId> {
+
+	fn loc_id(id: u32) -> LocId;
+}
+impl<LocId: From<u32>> LocIdFactory<LocId> for () {
+
+	fn loc_id(id: u32) -> LocId {
+		id.into()
+	}
+}
+
+pub trait CollectionItemIdFactory<CollectionItemId> {
+
+	fn collection_item_id(id: u8) -> CollectionItemId;
+}
+impl CollectionItemIdFactory<H256> for () {
+
+	fn collection_item_id(id: u8) -> H256 {
+		let bytes = sha2_256(&[id]);
+		H256(bytes)
+	}
+}
+
+pub trait TokensRecordIdFactory<TokensRecordId> {
+
+	fn tokens_record_id(id: u8) -> TokensRecordId;
+}
+impl TokensRecordIdFactory<H256> for () {
+
+	fn tokens_record_id(id: u8) -> H256 {
+		let bytes = sha2_256(&[id]);
+		H256(bytes)
+	}
+}
+
+pub trait EthereumAddressFactory<EthereumAddress> {
+
+	fn address(id: u8) -> EthereumAddress;
+}
+impl EthereumAddressFactory<H160> for () {
+
+	fn address(id: u8) -> H160 {
+		let bytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, id];
+		H160(bytes)
+	}
+}
+
+pub trait SponsorshipIdFactory<SponsorshipId> {
+
+	fn sponsorship_id(id: u32) -> SponsorshipId;
+}
+impl<SponsorshipId: From<u32>> SponsorshipIdFactory<SponsorshipId> for () {
+
+	fn sponsorship_id(id: u32) -> SponsorshipId {
+		id.into()
+	}
+}
 
 #[benchmarks]
 mod benchmarks {

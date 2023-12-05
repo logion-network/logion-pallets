@@ -34,6 +34,14 @@ use sp_std::{
     vec::Vec,
 };
 use sp_runtime::traits::Zero;
+#[cfg(feature = "runtime-benchmarks")]
+use benchmarking::{
+	LocIdFactory,
+	CollectionItemIdFactory,
+	TokensRecordIdFactory,
+	EthereumAddressFactory,
+	SponsorshipIdFactory,
+};
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
 pub enum LocType {
@@ -512,79 +520,6 @@ pub mod pallet {
     use crate::SupportedAccountId::Polkadot;
     use super::*;
     pub use crate::weights::WeightInfo;
-
-	#[cfg(feature = "runtime-benchmarks")]
-	use sp_io::hashing::sha2_256;
-	#[cfg(feature = "runtime-benchmarks")]
-	use sp_core::hash::H256;
-
-	#[cfg(feature = "runtime-benchmarks")]
-	pub trait LocIdFactory<LocId> {
-
-		fn loc_id(id: u32) -> LocId;
-	}
-	#[cfg(feature = "runtime-benchmarks")]
-	impl<LocId: From<u32>> LocIdFactory<LocId> for () {
-
-		fn loc_id(id: u32) -> LocId {
-			id.into()
-		}
-	}
-
-	#[cfg(feature = "runtime-benchmarks")]
-	pub trait CollectionItemIdFactory<CollectionItemId> {
-
-		fn collection_item_id(id: u8) -> CollectionItemId;
-	}
-	#[cfg(feature = "runtime-benchmarks")]
-	impl CollectionItemIdFactory<H256> for () {
-
-		fn collection_item_id(id: u8) -> H256 {
-			let bytes = sha2_256(&[id]);
-        	H256(bytes)
-		}
-	}
-
-	#[cfg(feature = "runtime-benchmarks")]
-	pub trait TokensRecordIdFactory<TokensRecordId> {
-
-		fn tokens_record_id(id: u8) -> TokensRecordId;
-	}
-	#[cfg(feature = "runtime-benchmarks")]
-	impl TokensRecordIdFactory<H256> for () {
-
-		fn tokens_record_id(id: u8) -> H256 {
-			let bytes = sha2_256(&[id]);
-        	H256(bytes)
-		}
-	}
-
-	#[cfg(feature = "runtime-benchmarks")]
-	pub trait EthereumAddressFactory<EthereumAddress> {
-
-		fn address(id: u8) -> EthereumAddress;
-	}
-	#[cfg(feature = "runtime-benchmarks")]
-	impl EthereumAddressFactory<H160> for () {
-
-		fn address(id: u8) -> H160 {
-			let bytes = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, id];
-			H160(bytes)
-		}
-	}
-
-	#[cfg(feature = "runtime-benchmarks")]
-	pub trait SponsorshipIdFactory<SponsorshipId> {
-
-		fn sponsorship_id(id: u32) -> SponsorshipId;
-	}
-	#[cfg(feature = "runtime-benchmarks")]
-	impl<SponsorshipId: From<u32>> SponsorshipIdFactory<SponsorshipId> for () {
-
-		fn sponsorship_id(id: u32) -> SponsorshipId {
-			id.into()
-		}
-	}
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
@@ -1170,7 +1105,7 @@ pub mod pallet {
         pub fn add_metadata(
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
-            item: MetadataItemParams<T::AccountId, T::EthereumAddress, <T as pallet::Config>::Hash>
+            item: MetadataItemParamsOf<T>
         ) -> DispatchResultWithPostInfo {
             let who = ensure_signed(origin)?;
 
@@ -1202,7 +1137,7 @@ pub mod pallet {
         pub fn add_file(
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
-            file: FileParams<<T as pallet::Config>::Hash, T::AccountId, T::EthereumAddress>
+            file: FileParamsOf<T>
         ) -> DispatchResultWithPostInfo {
             let who = ensure_signed(origin)?;
 
@@ -1245,12 +1180,7 @@ pub mod pallet {
         pub fn add_link(
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
-            link: LocLinkParams<
-                T::LocId,
-                <T as pallet::Config>::Hash,
-                T::AccountId,
-                T::EthereumAddress,
-            >,
+            link: LocLinkParamsOf<T>,
         ) -> DispatchResultWithPostInfo {
             let who = ensure_signed(origin)?;
 
@@ -1532,7 +1462,7 @@ pub mod pallet {
 
         /// Withdraws an unused sponsorship.
         #[pallet::call_index(20)]
-        #[pallet::weight(T::WeightInfo::sponsor())]
+        #[pallet::weight(T::WeightInfo::withdraw_sponsorship())]
         pub fn withdraw_sponsorship(
             origin: OriginFor<T>,
             #[pallet::compact] sponsorship_id: T::SponsorshipId,
