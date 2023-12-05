@@ -55,6 +55,7 @@ pub trait WeightInfo {
     fn add_tokens_record() -> Weight;
     fn create_other_identity_loc() -> Weight;
     fn sponsor() -> Weight;
+	fn withdraw_sponsorship() -> Weight;
     fn acknowledge_metadata() -> Weight;
     fn acknowledge_file() -> Weight;
     fn acknowledge_link() -> Weight;
@@ -150,6 +151,11 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
             .saturating_add(T::DbWeight::get().writes(1))
     }
     fn sponsor() -> Weight {
+        Weight::from_parts(20_945_000, 0)
+            .saturating_add(T::DbWeight::get().reads(2))
+            .saturating_add(T::DbWeight::get().writes(1))
+    }
+	fn withdraw_sponsorship() -> Weight {
         Weight::from_parts(20_945_000, 0)
             .saturating_add(T::DbWeight::get().reads(2))
             .saturating_add(T::DbWeight::get().writes(1))
@@ -261,6 +267,11 @@ impl WeightInfo for () {
             .saturating_add(RocksDbWeight::get().writes(1))
     }
     fn sponsor() -> Weight {
+        Weight::from_parts(20_945_000, 0)
+            .saturating_add(RocksDbWeight::get().reads(2))
+            .saturating_add(RocksDbWeight::get().writes(1))
+    }
+	fn withdraw_sponsorship() -> Weight {
         Weight::from_parts(20_945_000, 0)
             .saturating_add(RocksDbWeight::get().reads(2))
             .saturating_add(RocksDbWeight::get().writes(1))

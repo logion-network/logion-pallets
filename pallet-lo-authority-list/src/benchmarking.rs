@@ -21,6 +21,8 @@ mod benchmarks {
     // Benchmark `add_legal_officer` extrinsic with the worst possible conditions:
     // * Add host legal officer (causes re-computation of nodes set).
     // * There are already "many" legal officers.
+	//
+	// TODO: make this call at worst O(N) in number of LOs
     #[benchmark]
     fn add_legal_officer() -> Result<(), BenchmarkError> {
 		let initial_lo_count = LoAuthorityList::<T>::legal_officers().len();
@@ -44,6 +46,8 @@ mod benchmarks {
     // Benchmark `remove_legal_officer` extrinsic with the worst possible conditions:
     // * Remove host legal officer (causes re-computation of nodes set).
     // * There are already "many" legal officers.
+	//
+	// TODO: make this call at worst O(N) in number of LOs
     #[benchmark]
     fn remove_legal_officer() -> Result<(), BenchmarkError> {
 		let initial_lo_count = LoAuthorityList::<T>::legal_officers().len();
@@ -66,6 +70,8 @@ mod benchmarks {
 	// Benchmark `update_legal_officer` extrinsic with the worst possible conditions:
     // * Update host legal officer (causes re-computation of nodes set).
     // * There are already "many" legal officers.
+	//
+	// TODO: make this call at worst O(N) in number of LOs
     #[benchmark]
     fn update_legal_officer() -> Result<(), BenchmarkError> {
 		let initial_lo_count = LoAuthorityList::<T>::legal_officers().len();

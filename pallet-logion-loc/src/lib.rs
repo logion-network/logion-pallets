@@ -14,7 +14,6 @@ mod fees;
 #[cfg(test)]
 mod tests;
 
-#[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
 use codec::{Decode, Encode};
@@ -28,11 +27,21 @@ use scale_info::TypeInfo;
 use logion_shared::LegalOfficerCaseSummary;
 use crate::Requester::Account;
 use frame_system::pallet_prelude::BlockNumberFor;
+#[cfg(feature = "runtime-benchmarks")]
+use sp_core::H160;
 use sp_std::{
     collections::btree_set::BTreeSet,
     vec::Vec,
 };
 use sp_runtime::traits::Zero;
+#[cfg(feature = "runtime-benchmarks")]
+use benchmarking::{
+	LocIdFactory,
+	CollectionItemIdFactory,
+	TokensRecordIdFactory,
+	EthereumAddressFactory,
+	SponsorshipIdFactory,
+};
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
 pub enum LocType {
@@ -63,6 +72,12 @@ pub struct MetadataItemParams<AccountId, EthereumAddress, Hash> {
     submitter: SupportedAccountId<AccountId, EthereumAddress>,
 }
 
+pub type MetadataItemParamsOf<T> = MetadataItemParams<
+	<T as frame_system::Config>::AccountId,
+	<T as pallet::Config>::EthereumAddress,
+	<T as pallet::Config>::Hash,
+>;
+
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct LocLink<LocId, Hash, AccountId, EthereumAddress> {
     id: LocId,
@@ -78,6 +93,13 @@ pub struct LocLinkParams<LocId, Hash, AccountId, EthereumAddress> {
     nature: Hash,
     submitter: SupportedAccountId<AccountId, EthereumAddress>,
 }
+
+pub type LocLinkParamsOf<T> = LocLinkParams<
+	<T as pallet::Config>::LocId,
+	<T as pallet::Config>::Hash,
+	<T as frame_system::Config>::AccountId,
+	<T as pallet::Config>::EthereumAddress,
+>;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct File<Hash, AccountId, EthereumAddress> {
@@ -96,6 +118,12 @@ pub struct FileParams<Hash, AccountId, EthereumAddress> {
     submitter: SupportedAccountId<AccountId, EthereumAddress>,
     size: u32,
 }
+
+pub type FileParamsOf<T> = FileParams<
+	<T as pallet::Config>::Hash,
+	<T as frame_system::Config>::AccountId,
+	<T as pallet::Config>::EthereumAddress,
+>;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct ItemsParams<LocId, AccountId, EthereumAddress, Hash> {
@@ -587,6 +615,26 @@ pub mod pallet {
 
         /// Used to payout legal fees of a Collection LOC
         type CollectionLocLegalFeeDistributionKey: Get<DistributionKey>;
+
+		/// Loc ID factory for benchmark
+		#[cfg(feature = "runtime-benchmarks")]
+		type LocIdFactory: LocIdFactory<Self::LocId>;
+
+		/// Collection Item ID factory for benchmark
+		#[cfg(feature = "runtime-benchmarks")]
+		type CollectionItemIdFactory: CollectionItemIdFactory<Self::CollectionItemId>;
+
+		/// Tokens Record ID factory for benchmark
+		#[cfg(feature = "runtime-benchmarks")]
+		type TokensRecordIdFactory: TokensRecordIdFactory<Self::TokensRecordId>;
+
+		/// Ethereum address factory for benchmark
+		#[cfg(feature = "runtime-benchmarks")]
+		type EthereumAddressFactory: EthereumAddressFactory<Self::EthereumAddress>;
+
+		/// Sponsorship ID factory for benchmark
+		#[cfg(feature = "runtime-benchmarks")]
+		type SponsorshipIdFactory: SponsorshipIdFactory<Self::SponsorshipId>;
     }
 
     #[pallet::pallet]
@@ -1057,7 +1105,7 @@ pub mod pallet {
         pub fn add_metadata(
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
-            item: MetadataItemParams<T::AccountId, T::EthereumAddress, <T as pallet::Config>::Hash>
+            item: MetadataItemParamsOf<T>
         ) -> DispatchResultWithPostInfo {
             let who = ensure_signed(origin)?;
 
@@ -1089,7 +1137,7 @@ pub mod pallet {
         pub fn add_file(
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
-            file: FileParams<<T as pallet::Config>::Hash, T::AccountId, T::EthereumAddress>
+            file: FileParamsOf<T>
         ) -> DispatchResultWithPostInfo {
             let who = ensure_signed(origin)?;
 
@@ -1132,12 +1180,7 @@ pub mod pallet {
         pub fn add_link(
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
-            link: LocLinkParams<
-                T::LocId,
-                <T as pallet::Config>::Hash,
-                T::AccountId,
-                T::EthereumAddress,
-            >,
+            link: LocLinkParamsOf<T>,
         ) -> DispatchResultWithPostInfo {
             let who = ensure_signed(origin)?;
 
@@ -1419,7 +1462,7 @@ pub mod pallet {
 
         /// Withdraws an unused sponsorship.
         #[pallet::call_index(20)]
-        #[pallet::weight(T::WeightInfo::sponsor())]
+        #[pallet::weight(T::WeightInfo::withdraw_sponsorship())]
         pub fn withdraw_sponsorship(
             origin: OriginFor<T>,
             #[pallet::compact] sponsorship_id: T::SponsorshipId,
