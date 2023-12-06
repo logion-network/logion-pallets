@@ -12,6 +12,13 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+pub mod benchmarking;
+
+#[cfg(feature = "runtime-benchmarks")]
+use benchmarking::{
+	LocSetup,
+};
+
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct Vote<LocId, AccountId> {
     loc_id: LocId,
@@ -73,6 +80,9 @@ pub mod pallet {
 
         /// Weight information for extrinsics in this pallet.
         type WeightInfo: WeightInfo;
+
+		#[cfg(feature = "runtime-benchmarks")]
+		type LocSetup: LocSetup<Self::LocId, Self::AccountId>;
     }
 
     #[pallet::pallet]
