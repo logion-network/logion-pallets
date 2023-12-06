@@ -128,6 +128,7 @@ impl system::Config for Test {
     type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
+#[cfg(feature = "runtime-benchmarks")]
 pub struct LocSetupMock;
 
 #[cfg(feature = "runtime-benchmarks")]
