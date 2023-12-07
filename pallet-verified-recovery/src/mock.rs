@@ -1,6 +1,7 @@
 use crate::{self as pallet_verified_recovery};
 use logion_shared::{LocQuery, CreateRecoveryCallFactory, LegalOfficerCaseSummary};
 use sp_core::hash::H256;
+use frame_benchmarking::account;
 use frame_support::parameter_types;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup}, testing::Header, generic, BuildStorage,
@@ -9,6 +10,7 @@ use frame_system as system;
 use system::pallet_prelude::BlockNumberFor;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+type AccountId = u64;
 
 frame_support::construct_runtime!(
     pub enum Test {
@@ -33,7 +35,7 @@ impl system::Config for Test {
     type RuntimeCall = RuntimeCall;
     type Hash = H256;
     type Hashing = BlakeTwo256;
-    type AccountId = u64;
+    type AccountId = AccountId;
     type Lookup = IdentityLookup<Self::AccountId>;
     type RuntimeEvent = RuntimeEvent;
     type BlockHashCount = BlockHashCount;
@@ -57,11 +59,21 @@ impl CreateRecoveryCallFactory<<Test as system::Config>::RuntimeOrigin, <Test as
     }
 }
 
-pub const LEGAL_OFFICER_CLOSED_ID1: u64 = 1;
-pub const LEGAL_OFFICER_CLOSED_ID2: u64 = 2;
-pub const LEGAL_OFFICER_PENDING_OR_OPEN_ID1: u64 = 3;
-pub const LEGAL_OFFICER_PENDING_OR_OPEN_ID2: u64 = 4;
-pub const USER_ID: u64 = 5;
+pub fn legal_officer(index: u32) -> AccountId {
+	account("legal_officer", index, 0)
+}
+
+pub fn requester() -> AccountId {
+	account("requester", 1, 0)
+}
+
+pub fn legal_officers_closed() -> Vec<AccountId> {
+	Vec::from([legal_officer(1), legal_officer(2)])
+}
+
+pub fn legal_officers_not_closed() -> Vec<AccountId> {
+	Vec::from([legal_officer(3), legal_officer(4)])
+}
 
 pub struct LocQueryMock;
 impl LocQuery<<Test as pallet_verified_recovery::Config>::LocId, <Test as system::Config>::AccountId> for LocQueryMock {
@@ -69,12 +81,27 @@ impl LocQuery<<Test as pallet_verified_recovery::Config>::LocId, <Test as system
         account: &<Test as system::Config>::AccountId,
         legal_officers: &Vec<<Test as system::Config>::AccountId>
     ) -> bool {
-        return *account == USER_ID && legal_officers[0] == LEGAL_OFFICER_CLOSED_ID1 && legal_officers[1] == LEGAL_OFFICER_CLOSED_ID2;
+        return *account == requester() && legal_officers[0] == legal_officer(1) && legal_officers[1] == legal_officer(2);
     }
 
     fn get_loc(_loc_id: &<Test as pallet_verified_recovery::Config>::LocId) -> Option<LegalOfficerCaseSummary<<Test as system::Config>::AccountId>> {
         return None;
     }
+}
+
+#[cfg(feature = "runtime-benchmarks")]
+pub struct SetupBenchmarkMock;
+#[cfg(feature = "runtime-benchmarks")]
+pub use crate::benchmarking::SetupBenchmark;
+#[cfg(feature = "runtime-benchmarks")]
+impl SetupBenchmark<AccountId> for SetupBenchmarkMock {
+
+	fn setup() -> (AccountId, Vec<AccountId>) {
+		(
+			requester(),
+			vec!(legal_officer(1), legal_officer(2))
+		)
+	}
 }
 
 impl pallet_verified_recovery::Config for Test {
@@ -83,6 +110,8 @@ impl pallet_verified_recovery::Config for Test {
     type LocQuery = LocQueryMock;
     type RuntimeEvent = RuntimeEvent;
     type WeightInfo = ();
+	#[cfg(feature = "runtime-benchmarks")]
+	type SetupBenchmark = SetupBenchmarkMock;
 }
 
 // Build genesis storage according to the mock runtime.

@@ -8,6 +8,8 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+pub mod benchmarking;
+
 pub mod weights;
 
 #[frame_support::pallet]
@@ -22,6 +24,8 @@ pub mod pallet {
     use frame_support::traits::UnfilteredDispatchable;
     use sp_std::vec::Vec;
     pub use crate::weights::WeightInfo;
+	#[cfg(feature = "runtime-benchmarks")]
+	pub use crate::benchmarking::SetupBenchmark;
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
@@ -40,6 +44,9 @@ pub mod pallet {
 
         /// The overarching event type.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+
+		#[cfg(feature = "runtime-benchmarks")]
+		type SetupBenchmark: SetupBenchmark<Self::AccountId>;
     }
 
     #[pallet::pallet]
