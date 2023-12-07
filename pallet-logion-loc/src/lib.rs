@@ -19,7 +19,6 @@ mod benchmarking;
 use codec::{Decode, Encode};
 use frame_support::{
     BoundedVec,
-    pallet_prelude::Weight,
     sp_runtime::Saturating,
     traits::{Currency, ReservableCurrency},
 };
@@ -133,21 +132,6 @@ pub struct ItemsParams<LocId, AccountId, EthereumAddress, Hash> {
 }
 
 impl<LocId, AccountId, EthereumAddress, Hash> ItemsParams<LocId, AccountId, EthereumAddress, Hash> {
-
-    pub fn weight<T: pallet::Config>(&self) -> Weight {
-        let metadata_weight = self.metadata.iter()
-            .map(|_item| T::WeightInfo::add_metadata())
-            .fold(Weight::zero(), |total: Weight, weight: Weight| total.saturating_add(weight));
-        let files_weight = self.files.iter()
-            .map(|_item| T::WeightInfo::add_file())
-            .fold(Weight::zero(), |total: Weight, weight: Weight| total.saturating_add(weight));
-        let links_weight = self.links.iter()
-            .map(|_item| T::WeightInfo::add_link())
-            .fold(Weight::zero(), |total: Weight, weight: Weight| total.saturating_add(weight));
-        metadata_weight
-            .saturating_add(files_weight)
-            .saturating_add(links_weight)
-    }
 
     pub fn empty() -> ItemsParams<LocId, AccountId, EthereumAddress, Hash> {
         ItemsParams {
@@ -914,7 +898,7 @@ pub mod pallet {
 
         /// Creates a new Polkadot Identity LOC i.e. a LOC linking a real identity to an AccountId.
         #[pallet::call_index(0)]
-        #[pallet::weight(T::WeightInfo::create_polkadot_identity_loc().saturating_add(items.weight::<T>()))]
+        #[pallet::weight(T::WeightInfo::create_polkadot_identity_loc())]
         pub fn create_polkadot_identity_loc(
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
@@ -972,7 +956,7 @@ pub mod pallet {
 
         /// Creates a new Polkadot Transaction LOC i.e. a LOC requested with an AccountId
         #[pallet::call_index(2)]
-        #[pallet::weight(T::WeightInfo::create_polkadot_transaction_loc().saturating_add(items.weight::<T>()))]
+        #[pallet::weight(T::WeightInfo::create_polkadot_transaction_loc())]
         pub fn create_polkadot_transaction_loc(
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
@@ -1041,7 +1025,7 @@ pub mod pallet {
 
         /// Creates a new Collection LOC
         #[pallet::call_index(4)]
-        #[pallet::weight(T::WeightInfo::create_collection_loc().saturating_add(items.weight::<T>()))]
+        #[pallet::weight(T::WeightInfo::create_collection_loc())]
         pub fn create_collection_loc(
             origin: OriginFor<T>,
             #[pallet::compact] loc_id: T::LocId,
