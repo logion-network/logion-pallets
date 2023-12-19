@@ -7,7 +7,6 @@ use crate::{Pallet as Vote};
 use frame_benchmarking::{impl_benchmark_test_suite, v2::*, BenchmarkError};
 use frame_support::assert_ok;
 use frame_system::RawOrigin;
-use sp_std::vec;
 
 pub trait LocSetup<LocId, AccountId> {
 

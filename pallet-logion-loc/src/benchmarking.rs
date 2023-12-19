@@ -13,7 +13,6 @@ use logion_shared::IsLegalOfficer;
 use sp_core::{Get, hash::H256};
 use sp_io::hashing::sha2_256;
 use sp_runtime::traits::Bounded;
-use sp_std::vec;
 
 
 pub trait LocIdFactory<LocId> {

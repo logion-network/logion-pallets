@@ -7,7 +7,7 @@ use crate::{Pallet as VerifiedRecovery};
 
 use frame_benchmarking::{impl_benchmark_test_suite, v2::*, BenchmarkError};
 use frame_system::RawOrigin;
-use sp_std::{vec, vec::Vec};
+use sp_std::vec::Vec;
 
 pub trait SetupBenchmark<AccountId> {
 
