@@ -21,6 +21,7 @@ const LOGION_CLASSIFICATION_LOC_ID: u32 = 2;
 const ADDITIONAL_TC_LOC_ID: u32 = 3;
 const ISSUER1_IDENTITY_LOC_ID: u32 = 4;
 const ISSUER2_IDENTITY_LOC_ID: u32 = 5;
+const INVITED_CONTRIBUTOR_IDENTITY_LOC_ID: u32 = 6;
 const FILE_SIZE: u32 = 90;
 const ONE_LGNT: Balance = 1_000_000_000_000_000_000;
 const INITIAL_BALANCE: Balance = (3 * 2000 * ONE_LGNT) + ONE_LGNT;
@@ -73,6 +74,7 @@ fn setup_default_balances() {
     set_balance(ISSUER_ID1, INITIAL_BALANCE);
     set_balance(ISSUER_ID2, INITIAL_BALANCE);
     set_balance(LOGION_TREASURY_ACCOUNT_ID, INITIAL_BALANCE);
+    set_balance(INVITED_CONTRIBUTOR_ID, INITIAL_BALANCE);
 }
 
 fn set_balance(account_id: AccountId, amount: Balance) {
@@ -1935,7 +1937,11 @@ fn it_adds_tokens_record(submitter: AccountId) {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         create_closed_collection_with_selected_issuer();
-        let record_id = build_record_id();
+
+		create_closed_polkadot_identity_loc(INVITED_CONTRIBUTOR_ID, INVITED_CONTRIBUTOR_IDENTITY_LOC_ID);
+		assert_ok!(LogionLoc::set_invited_contributor_selection(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, INVITED_CONTRIBUTOR_ID, true));
+
+		let record_id = build_record_id();
         let record_description = build_record_description();
         let record_files = build_record_files(1);
 
@@ -3164,4 +3170,68 @@ fn it_fails_to_add_tokens_record_when_insufficient_funds() {
 
         assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, record_id, record_description.clone(), record_files.clone()), Error::<Test>::InsufficientFunds);
     });
+}
+
+fn create_closed_polkadot_identity_loc(account_id: u64, identity_loc: u32) {
+	assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(account_id), identity_loc, legal_officer_id(1), 0, ItemsParams::empty()));
+	assert_ok!(LogionLoc::close(RuntimeOrigin::signed(legal_officer_id(1)), identity_loc, None, false));
+}
+
+#[test]
+fn it_sets_invited_contributor_selection() {
+	new_test_ext().execute_with(|| {
+		setup_default_balances();
+		assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, legal_officer_id(1), None, Some(10), true, 0, OTHER_LOC_DEFAULT_LEGAL_FEE, 0, TOKENS_RECORD_FEE, ItemsParams::empty()));
+		create_closed_polkadot_identity_loc(INVITED_CONTRIBUTOR_ID, INVITED_CONTRIBUTOR_IDENTITY_LOC_ID);
+
+		assert_eq!(LogionLoc::selected_invited_contributors(LOC_ID, INVITED_CONTRIBUTOR_ID), None);
+		assert_ok!(LogionLoc::set_invited_contributor_selection(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, INVITED_CONTRIBUTOR_ID, true));
+		assert_eq!(LogionLoc::selected_invited_contributors(LOC_ID, INVITED_CONTRIBUTOR_ID), Some(()));
+		assert_ok!(LogionLoc::set_invited_contributor_selection(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, INVITED_CONTRIBUTOR_ID, false));
+		assert_eq!(LogionLoc::selected_invited_contributors(LOC_ID, INVITED_CONTRIBUTOR_ID), None);
+	});
+}
+
+#[test]
+fn it_fails_to_set_invited_contributor_selection_on_non_existent_loc() {
+	new_test_ext().execute_with(|| {
+		setup_default_balances();
+		create_closed_polkadot_identity_loc(INVITED_CONTRIBUTOR_ID, INVITED_CONTRIBUTOR_IDENTITY_LOC_ID);
+		assert_err!(LogionLoc::set_invited_contributor_selection(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, INVITED_CONTRIBUTOR_ID, true), Error::<Test>::NotFound);
+	});
+}
+
+#[test]
+fn it_fails_to_set_invited_contributor_selection_when_not_requester() {
+	new_test_ext().execute_with(|| {
+		setup_default_balances();
+		assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, legal_officer_id(1), None, Some(10), true, 0, OTHER_LOC_DEFAULT_LEGAL_FEE, 0, TOKENS_RECORD_FEE, ItemsParams::empty()));
+		create_closed_polkadot_identity_loc(INVITED_CONTRIBUTOR_ID, INVITED_CONTRIBUTOR_IDENTITY_LOC_ID);
+		assert_err!(LogionLoc::set_invited_contributor_selection(RuntimeOrigin::signed(UNAUTHORIZED_CALLER), LOC_ID, INVITED_CONTRIBUTOR_ID, true), Error::<Test>::Unauthorized);
+	});
+}
+
+#[test]
+fn it_fails_to_set_invited_contributor_selection_when_not_identified() {
+	new_test_ext().execute_with(|| {
+		setup_default_balances();
+		assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, legal_officer_id(1), None, Some(10), true, 0, OTHER_LOC_DEFAULT_LEGAL_FEE, 0, TOKENS_RECORD_FEE, ItemsParams::empty()));
+		assert_err!(LogionLoc::set_invited_contributor_selection(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, INVITED_CONTRIBUTOR_ID, true), Error::<Test>::AccountNotIdentified);
+	});
+}
+
+#[test]
+fn it_fails_to_set_invited_contributor_selection_on_void_loc() {
+	new_test_ext().execute_with(|| {
+		setup_default_balances();
+		assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, legal_officer_id(1), None, Some(10), true, 0, OTHER_LOC_DEFAULT_LEGAL_FEE, 0, TOKENS_RECORD_FEE, ItemsParams::empty()));
+		create_closed_polkadot_identity_loc(INVITED_CONTRIBUTOR_ID, INVITED_CONTRIBUTOR_IDENTITY_LOC_ID);
+		assert_ok!(LogionLoc::make_void(RuntimeOrigin::signed(legal_officer_id(1)), LOC_ID));
+		assert_err!(LogionLoc::set_invited_contributor_selection(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, INVITED_CONTRIBUTOR_ID, true), Error::<Test>::CannotMutateVoid);
+	});
+}
+
+#[test]
+fn it_adds_tokens_record_as_invited_contributor() {
+	it_adds_tokens_record(INVITED_CONTRIBUTOR_ID);
 }
