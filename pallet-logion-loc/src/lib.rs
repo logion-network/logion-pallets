@@ -984,6 +984,8 @@ pub mod pallet {
                 Err(Error::<T>::Unauthorized)?
             } else if <LocMap<T>>::contains_key(&loc_id) {
                 Err(Error::<T>::AlreadyExists)?
+			} else if !Self::has_closed_identity_loc(&requester_account_id, &legal_officer) {
+				Err(Error::<T>::AccountNotIdentified)?
             } else {
                 let requester = RequesterOf::<T>::Account(requester_account_id.clone());
                 let mut loc = Self::build_open_loc(&legal_officer, &requester, LocType::Transaction, None, legal_fee);
@@ -1059,7 +1061,9 @@ pub mod pallet {
                 Err(Error::<T>::Unauthorized)?
             } else if collection_last_block_submission.is_none() && collection_max_size.is_none() {
                 Err(Error::<T>::CollectionHasNoLimit)?
-            }
+            } else if !Self::has_closed_identity_loc(&requester_account_id, &legal_officer) {
+				Err(Error::<T>::AccountNotIdentified)?
+			}
 
             if <LocMap<T>>::contains_key(&loc_id) {
                 Err(Error::<T>::AlreadyExists)?
