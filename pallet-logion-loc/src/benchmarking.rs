@@ -731,6 +731,54 @@ mod benchmarks {
 		Ok(())
 	}
 
+	// Benchmark `set_invited_contributor_selection` extrinsic.
+	#[benchmark]
+	fn set_invited_contributor_selection() -> Result<(), BenchmarkError> {
+		let legal_officer_id = any_legal_officer::<T>();
+		let requester: T::AccountId = account("requester", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
+
+		ensure_enough_funds::<T>(&requester);
+
+		let invited_contributor: T::AccountId = account("invited_contributor", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(INVITED_CONTRIBUTOR_IDENTITY_LOC_ID), &legal_officer_id, &invited_contributor);
+
+		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
+		assert_ok!(LogionLoc::<T>::create_collection_loc(
+			<T as frame_system::Config>::RuntimeOrigin::from(RawOrigin::Signed(requester.clone())),
+			loc_id,
+			legal_officer_id.clone(),
+			None,
+			Some(100),
+			true,
+			0u32.into(),
+			0u32.into(),
+			0u32.into(),
+			0u32.into(),
+			ItemsParams {
+				metadata: Vec::new(),
+				files: Vec::new(),
+				links: Vec::new(),
+			},
+		));
+		assert_ok!(LogionLoc::<T>::close(
+			<T as frame_system::Config>::RuntimeOrigin::from(RawOrigin::Signed(legal_officer_id.clone())),
+			loc_id,
+			None,
+			false,
+		));
+
+		#[extrinsic_call]
+		_(
+			RawOrigin::Signed(requester.clone()),
+			loc_id,
+			requester.clone(),
+			true,
+		);
+
+		Ok(())
+	}
+
 	impl_benchmark_test_suite! {
 		LogionLoc,
 		crate::mock::new_test_ext(),
@@ -832,8 +880,30 @@ fn create_loc<T: pallet::Config>(loc_id: T::LocId, legal_officer_id: &T::Account
 	));
 }
 
+fn create_closed_polkadot_identity_loc<T: pallet::Config>(loc_id: T::LocId, legal_officer_id: &T::AccountId, requester: &T::AccountId) {
+	assert_ok!(LogionLoc::<T>::create_polkadot_identity_loc(
+		<T as frame_system::Config>::RuntimeOrigin::from(RawOrigin::Signed(requester.clone())),
+		loc_id,
+		legal_officer_id.clone(),
+		0u32.into(),
+		ItemsParams {
+			metadata: Vec::new(),
+			files: Vec::new(),
+			links: Vec::new(),
+		},
+	));
+	assert_ok!(LogionLoc::<T>::close(
+		<T as frame_system::Config>::RuntimeOrigin::from(RawOrigin::Signed(legal_officer_id.clone())),
+		loc_id,
+		None,
+		false,
+	));
+}
+
 const MANY_ITEMS: u32 = 10;
 const NEXT_LOC_ID: u32 = MANY_ITEMS;
+const REQUESTER_IDENTITY_LOC_ID: u32 = NEXT_LOC_ID + 2;
+const INVITED_CONTRIBUTOR_IDENTITY_LOC_ID: u32 = NEXT_LOC_ID + 3;
 
 fn setup_empty_loc<T: pallet::Config>() -> (T::LocId, T::AccountId) {
 	let legal_officer_id = any_legal_officer::<T>();

@@ -1721,7 +1721,7 @@ pub mod pallet {
 
 		/// Select/unselect an invited contributor on a given LOC
 		#[pallet::call_index(25)]
-		#[pallet::weight(T::WeightInfo::set_issuer_selection())]
+		#[pallet::weight(T::WeightInfo::set_invited_contributor_selection())]
 		pub fn set_invited_contributor_selection(
 			origin: OriginFor<T>,
 			#[pallet::compact] loc_id: T::LocId,
