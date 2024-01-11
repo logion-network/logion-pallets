@@ -85,6 +85,7 @@ mod benchmarks {
 	fn create_polkadot_identity_loc() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 		let items = many_items::<T>(&requester);
 		let next_loc_id: T::LocId = T::LocIdFactory::loc_id(NEXT_LOC_ID);
@@ -128,6 +129,7 @@ mod benchmarks {
 	fn create_polkadot_transaction_loc() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 		let items = many_items::<T>(&requester);
 		let next_loc_id: T::LocId = T::LocIdFactory::loc_id(NEXT_LOC_ID);
@@ -183,6 +185,7 @@ mod benchmarks {
 	fn create_collection_loc() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 		let items = many_items::<T>(&requester);
 		let next_loc_id: T::LocId = T::LocIdFactory::loc_id(NEXT_LOC_ID);
@@ -253,6 +256,7 @@ mod benchmarks {
 	fn add_link() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 		create_locs_to_link_to::<T>(&requester); // Targets of the many links
 		create_loc::<T>(T::LocIdFactory::loc_id(MANY_ITEMS), &legal_officer_id, &requester); // New target
@@ -312,6 +316,7 @@ mod benchmarks {
 	fn add_collection_item() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 
 		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
@@ -481,6 +486,7 @@ mod benchmarks {
 	fn add_tokens_record() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 
 		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
@@ -602,6 +608,7 @@ mod benchmarks {
 	fn acknowledge_metadata() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 
 		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
@@ -637,6 +644,7 @@ mod benchmarks {
 	fn acknowledge_file() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 
 		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
@@ -672,6 +680,7 @@ mod benchmarks {
 	fn acknowledge_link() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 		create_locs_to_link_to::<T>(&requester); // Targets of the many links
 
@@ -708,6 +717,7 @@ mod benchmarks {
 	fn close() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 		let items = many_items::<T>(&requester);
 		let next_loc_id: T::LocId = T::LocIdFactory::loc_id(NEXT_LOC_ID);
@@ -725,6 +735,54 @@ mod benchmarks {
 			RawOrigin::Signed(legal_officer_id.clone()),
 			next_loc_id,
 			None,
+			true,
+		);
+
+		Ok(())
+	}
+
+	// Benchmark `set_invited_contributor_selection` extrinsic.
+	#[benchmark]
+	fn set_invited_contributor_selection() -> Result<(), BenchmarkError> {
+		let legal_officer_id = any_legal_officer::<T>();
+		let requester: T::AccountId = account("requester", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
+
+		ensure_enough_funds::<T>(&requester);
+
+		let invited_contributor: T::AccountId = account("invited_contributor", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(INVITED_CONTRIBUTOR_IDENTITY_LOC_ID), &legal_officer_id, &invited_contributor);
+
+		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
+		assert_ok!(LogionLoc::<T>::create_collection_loc(
+			<T as frame_system::Config>::RuntimeOrigin::from(RawOrigin::Signed(requester.clone())),
+			loc_id,
+			legal_officer_id.clone(),
+			None,
+			Some(100),
+			true,
+			0u32.into(),
+			0u32.into(),
+			0u32.into(),
+			0u32.into(),
+			ItemsParams {
+				metadata: Vec::new(),
+				files: Vec::new(),
+				links: Vec::new(),
+			},
+		));
+		assert_ok!(LogionLoc::<T>::close(
+			<T as frame_system::Config>::RuntimeOrigin::from(RawOrigin::Signed(legal_officer_id.clone())),
+			loc_id,
+			None,
+			false,
+		));
+
+		#[extrinsic_call]
+		_(
+			RawOrigin::Signed(requester.clone()),
+			loc_id,
+			requester.clone(),
 			true,
 		);
 
@@ -832,12 +890,35 @@ fn create_loc<T: pallet::Config>(loc_id: T::LocId, legal_officer_id: &T::Account
 	));
 }
 
+fn create_closed_polkadot_identity_loc<T: pallet::Config>(loc_id: T::LocId, legal_officer_id: &T::AccountId, requester: &T::AccountId) {
+	assert_ok!(LogionLoc::<T>::create_polkadot_identity_loc(
+		<T as frame_system::Config>::RuntimeOrigin::from(RawOrigin::Signed(requester.clone())),
+		loc_id,
+		legal_officer_id.clone(),
+		0u32.into(),
+		ItemsParams {
+			metadata: Vec::new(),
+			files: Vec::new(),
+			links: Vec::new(),
+		},
+	));
+	assert_ok!(LogionLoc::<T>::close(
+		<T as frame_system::Config>::RuntimeOrigin::from(RawOrigin::Signed(legal_officer_id.clone())),
+		loc_id,
+		None,
+		false,
+	));
+}
+
 const MANY_ITEMS: u32 = 10;
 const NEXT_LOC_ID: u32 = MANY_ITEMS;
+const REQUESTER_IDENTITY_LOC_ID: u32 = NEXT_LOC_ID + 2;
+const INVITED_CONTRIBUTOR_IDENTITY_LOC_ID: u32 = NEXT_LOC_ID + 3;
 
 fn setup_empty_loc<T: pallet::Config>() -> (T::LocId, T::AccountId) {
 	let legal_officer_id = any_legal_officer::<T>();
 	let requester: T::AccountId = account("requester", 1, SEED);
+	create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
 	ensure_enough_funds::<T>(&requester);
 	let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
 	create_loc::<T>(loc_id, &legal_officer_id, &requester);

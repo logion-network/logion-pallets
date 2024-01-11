@@ -3,6 +3,7 @@ use crate::{self as pallet_block_reward, NegativeImbalanceOf};
 use frame_support::{
     construct_runtime, parameter_types, traits::Currency,
 };
+use frame_support::dispatch::RawOrigin;
 use frame_support::traits::EnsureOrigin;
 use frame_system as system;
 
@@ -123,6 +124,9 @@ parameter_types! {
     };
 }
 
+#[cfg(feature = "runtime-benchmarks")]
+pub type OuterOrigin<T> = <T as frame_system::Config>::RuntimeOrigin;
+
 pub struct LoAuthorityListMock;
 impl EnsureOrigin<RuntimeOrigin> for LoAuthorityListMock {
     type Success = <Test as system::Config>::AccountId;
@@ -130,6 +134,11 @@ impl EnsureOrigin<RuntimeOrigin> for LoAuthorityListMock {
     fn try_origin(o: <Test as system::Config>::RuntimeOrigin) -> Result<Self::Success, <Test as system::Config>::RuntimeOrigin> {
         <Self as IsLegalOfficer<<Test as system::Config>::AccountId, <Test as system::Config>::RuntimeOrigin>>::try_origin(o)
     }
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+		Ok(OuterOrigin::<Test>::from(RawOrigin::Signed(LEGAL_OFFICER_ACCOUNT_1)))
+	}
 }
 
 impl IsLegalOfficer<<Test as system::Config>::AccountId, RuntimeOrigin> for LoAuthorityListMock {

@@ -90,6 +90,7 @@ pub const ISSUER_ID2: u64 = 6;
 pub const SPONSOR_ID: u64 = 7;
 pub const LOGION_TREASURY_ACCOUNT_ID: u64 = 8;
 pub const UNAUTHORIZED_CALLER: u64 = 9;
+pub const INVITED_CONTRIBUTOR_ID: u64 = 10;
 
 #[cfg(feature = "runtime-benchmarks")]
 pub type OuterOrigin<T> = <T as frame_system::Config>::RuntimeOrigin;

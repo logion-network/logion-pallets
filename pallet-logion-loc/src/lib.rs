@@ -708,7 +708,19 @@ pub mod pallet {
     #[pallet::getter(fn sponsorship)]
     pub type SponsorshipMap<T> = StorageMap<_, Blake2_128Concat, <T as Config>::SponsorshipId, SponsorshipOf<T>>;
 
-    #[pallet::event]
+	/// Invited Contributors by LOC
+	#[pallet::storage]
+	#[pallet::getter(fn selected_invited_contributors)]
+	pub type InvitedContributorsByLocMap<T> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		<T as Config>::LocId,
+		Blake2_128Concat,
+		<T as frame_system::Config>::AccountId, // invited contributor
+		()
+	>;
+
+	#[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
         /// Issued upon LOC creation. [locId]
@@ -836,6 +848,8 @@ pub mod pallet {
         BadTokenIssuance,
         /// There is still at least one Item (Metadata, Link or File) unacknowledged by verified issuer
         CannotCloseUnacknowledgedByVerifiedIssuer,
+		/// The provided Polkadot account has no closed, non-void identity LOC
+		AccountNotIdentified,
     }
 
     #[pallet::hooks]
@@ -970,6 +984,8 @@ pub mod pallet {
                 Err(Error::<T>::Unauthorized)?
             } else if <LocMap<T>>::contains_key(&loc_id) {
                 Err(Error::<T>::AlreadyExists)?
+			} else if !Self::has_closed_identity_loc(&requester_account_id, &legal_officer) {
+				Err(Error::<T>::AccountNotIdentified)?
             } else {
                 let requester = RequesterOf::<T>::Account(requester_account_id.clone());
                 let mut loc = Self::build_open_loc(&legal_officer, &requester, LocType::Transaction, None, legal_fee);
@@ -1045,7 +1061,9 @@ pub mod pallet {
                 Err(Error::<T>::Unauthorized)?
             } else if collection_last_block_submission.is_none() && collection_max_size.is_none() {
                 Err(Error::<T>::CollectionHasNoLimit)?
-            }
+            } else if !Self::has_closed_identity_loc(&requester_account_id, &legal_officer) {
+				Err(Error::<T>::AccountNotIdentified)?
+			}
 
             if <LocMap<T>>::contains_key(&loc_id) {
                 Err(Error::<T>::AlreadyExists)?
@@ -1700,6 +1718,43 @@ pub mod pallet {
                 }
             }
         }
+
+		/// Select/unselect an invited contributor on a given LOC
+		#[pallet::call_index(25)]
+		#[pallet::weight(T::WeightInfo::set_invited_contributor_selection())]
+		pub fn set_invited_contributor_selection(
+			origin: OriginFor<T>,
+			#[pallet::compact] loc_id: T::LocId,
+			invited_contributor: T::AccountId,
+			selected: bool,
+		) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+			if !<LocMap<T>>::contains_key(&loc_id) {
+				Err(Error::<T>::NotFound)?
+			} else {
+				let loc = <LocMap<T>>::get(&loc_id).unwrap();
+				match &loc.requester {
+					Account(requester_account) =>
+						if requester_account.clone() != who {
+							Err(Error::<T>::Unauthorized)?
+						},
+					_ => Err(Error::<T>::Unauthorized)?
+				};
+				if loc.void_info.is_some() {
+					Err(Error::<T>::CannotMutateVoid)?
+				} else if !Self::has_closed_identity_loc(&invited_contributor, &loc.owner) {
+					Err(Error::<T>::AccountNotIdentified)?
+				} else {
+					let already_invited_contributor = Self::selected_invited_contributors(loc_id, &invited_contributor);
+					if already_invited_contributor.is_some() && !selected {
+						<InvitedContributorsByLocMap<T>>::remove(loc_id, &invited_contributor);
+					} else if already_invited_contributor.is_none() && selected {
+						<InvitedContributorsByLocMap<T>>::insert(loc_id, &invited_contributor, ());
+					}
+					Ok(().into())
+				}
+			}
+		}
     }
 
     impl<T: Config> LocQuery<T::LocId, <T as frame_system::Config>::AccountId> for Pallet<T> {
@@ -2076,6 +2131,7 @@ pub mod pallet {
                     match &collection_loc.requester { Account(requester) => requester == adder, _ => false }
                     || *adder == collection_loc.owner
                     || Self::selected_verified_issuers(loc_id, adder).is_some()
+                    || Self::selected_invited_contributors(loc_id, adder).is_some()
                 )
                 && collection_loc.closed
                 && collection_loc.void_info.is_none()
