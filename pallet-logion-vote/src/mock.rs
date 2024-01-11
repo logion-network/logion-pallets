@@ -135,6 +135,7 @@ pub struct LocSetupMock;
 use crate::benchmarking::{
 	LocSetup,
 };
+use crate::weights::SubstrateWeight;
 
 #[cfg(feature = "runtime-benchmarks")]
 impl LocSetup<LocId, AccountId> for LocSetupMock {
@@ -152,7 +153,7 @@ impl pallet_logion_vote::Config for Test {
     type LocValidity = LocValidityMock;
     type LocQuery = LocQueryMock;
     type LegalOfficerCreation = LegalOfficerCreationMock;
-    type WeightInfo = ();
+    type WeightInfo = SubstrateWeight<Test>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type LocSetup = LocSetupMock;
 }

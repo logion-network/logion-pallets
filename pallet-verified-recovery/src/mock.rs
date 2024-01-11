@@ -93,6 +93,8 @@ impl LocQuery<<Test as pallet_verified_recovery::Config>::LocId, <Test as system
 pub struct SetupBenchmarkMock;
 #[cfg(feature = "runtime-benchmarks")]
 pub use crate::benchmarking::SetupBenchmark;
+use crate::weights::SubstrateWeight;
+
 #[cfg(feature = "runtime-benchmarks")]
 impl SetupBenchmark<AccountId> for SetupBenchmarkMock {
 
@@ -109,7 +111,7 @@ impl pallet_verified_recovery::Config for Test {
     type CreateRecoveryCallFactory = CreateRecoveryCallFactoryMock;
     type LocQuery = LocQueryMock;
     type RuntimeEvent = RuntimeEvent;
-    type WeightInfo = ();
+    type WeightInfo = SubstrateWeight<Test>;
 	#[cfg(feature = "runtime-benchmarks")]
 	type SetupBenchmark = SetupBenchmarkMock;
 }

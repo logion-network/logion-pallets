@@ -3,6 +3,7 @@ use crate::{self as pallet_block_reward, NegativeImbalanceOf};
 use frame_support::{
     construct_runtime, parameter_types, traits::Currency,
 };
+#[cfg(feature = "runtime-benchmarks")]
 use frame_support::dispatch::RawOrigin;
 use frame_support::traits::EnsureOrigin;
 use frame_system as system;

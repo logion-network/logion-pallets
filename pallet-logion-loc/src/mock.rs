@@ -96,6 +96,7 @@ pub const INVITED_CONTRIBUTOR_ID: u64 = 10;
 pub type OuterOrigin<T> = <T as frame_system::Config>::RuntimeOrigin;
 #[cfg(feature = "runtime-benchmarks")]
 use frame_system::RawOrigin;
+use crate::weights::SubstrateWeight;
 
 pub struct LoAuthorityListMock;
 impl EnsureOrigin<RuntimeOrigin> for LoAuthorityListMock {
@@ -223,7 +224,7 @@ impl pallet_loc::Config for Test {
     type MaxFileNameSize = MaxFileNameSize;
     type MaxFileContentTypeSize = MaxFileContentTypeSize;
     type MaxTokensRecordFiles = MaxTokensRecordFiles;
-    type WeightInfo = ();
+    type WeightInfo = SubstrateWeight<Test>;
     type Currency = Balances;
     type FileStorageByteFee = FileStorageByteFee;
     type FileStorageEntryFee = FileStorageEntryFee;
