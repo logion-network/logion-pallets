@@ -3,6 +3,7 @@ use logion_shared::{IsLegalOfficer, MultisigApproveAsMultiCallFactory, MultisigA
 use pallet_multisig::Timepoint;
 use sp_core::hash::H256;
 use frame_support::{parameter_types, traits::EnsureOrigin};
+use frame_support::dispatch::RawOrigin;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup}, testing::Header, generic, BuildStorage,
 };
@@ -94,6 +95,9 @@ impl IsLegalOfficer<<Test as system::Config>::AccountId, RuntimeOrigin> for IsLe
     }
 }
 
+#[cfg(feature = "runtime-benchmarks")]
+pub type OuterOrigin<T> = <T as frame_system::Config>::RuntimeOrigin;
+
 impl EnsureOrigin<RuntimeOrigin> for IsLegalOfficerMock {
     type Success = <Test as system::Config>::AccountId;
 
@@ -110,6 +114,11 @@ impl EnsureOrigin<RuntimeOrigin> for IsLegalOfficerMock {
             Err(_) => Err(o)
         }
     }
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin() -> Result<RuntimeOrigin, ()> {
+		Ok(OuterOrigin::<Test>::from(RawOrigin::Signed(LEGAL_OFFICER1)))
+	}
 }
 
 impl pallet_logion_vault::Config for Test {
