@@ -3,6 +3,7 @@ use logion_shared::{IsLegalOfficer, MultisigApproveAsMultiCallFactory, MultisigA
 use pallet_multisig::Timepoint;
 use sp_core::hash::H256;
 use frame_support::{parameter_types, traits::EnsureOrigin};
+#[cfg(feature = "runtime-benchmarks")]
 use frame_support::dispatch::RawOrigin;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup}, testing::Header, generic, BuildStorage,

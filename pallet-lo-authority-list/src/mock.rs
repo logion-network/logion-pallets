@@ -8,6 +8,7 @@ use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup}, testing::Header, generic,
     BuildStorage,
 };
+use crate::weights::SubstrateWeight;
 
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 
@@ -91,7 +92,7 @@ impl pallet_lo_authority_list::Config for Test {
     type UpdateOrigin = EnsureRoot<u64>;
     type Region = Region;
     type RuntimeEvent = RuntimeEvent;
-    type WeightInfo = ();
+	type WeightInfo = SubstrateWeight<Test>;
 }
 
 // Build genesis storage according to the mock runtime.
