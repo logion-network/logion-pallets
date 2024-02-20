@@ -4,6 +4,7 @@ use frame_support::dispatch::DispatchResultWithPostInfo;
 use frame_support::traits::Len;
 use frame_system::pallet_prelude::{BlockNumberFor, OriginFor};
 use sp_core::{H160, H256};
+use sp_core::bounded::BoundedVec;
 use sp_runtime::traits::BlakeTwo256;
 use sp_runtime::traits::Hash;
 
@@ -46,7 +47,7 @@ fn it_creates_loc_with_default_legal_fee() {
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: legal_officer_id(1),
             requester: LOC_REQUESTER,
-            metadata: vec![],
+            metadata: BoundedVec::new(),
             files: vec![],
             closed: false,
             loc_type: LocType::Transaction,
@@ -94,7 +95,7 @@ fn it_creates_loc_with_custom_legal_fee() {
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: legal_officer_id(1),
             requester: LOC_REQUESTER,
-            metadata: vec![],
+            metadata: BoundedVec::new(),
             files: vec![],
             closed: false,
             loc_type: LocType::Transaction,
@@ -1205,7 +1206,7 @@ fn it_creates_collection_loc() {
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: legal_officer_id(1),
             requester: LOC_REQUESTER,
-            metadata: vec![],
+            metadata: BoundedVec::new(),
             files: vec![],
             closed: false,
             loc_type: LocType::Collection,
@@ -1753,6 +1754,23 @@ fn it_adds_several_metadata() {
 }
 
 #[test]
+fn it_fails_to_add_too_much_metadata() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        assert_ok!(create_identity_and_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, legal_officer_id(1), OTHER_LOC_DEFAULT_LEGAL_FEE, ItemsParams::empty()));
+		for i in 0..MAX_LOC_ITEMS {
+			let _ = add_metadata(i, LOC_REQUESTER_ID);
+		}
+        let metadata = MetadataItemParams {
+            name: sha256(&vec![1, 2, 3]),
+            value: sha256(&vec![4, 5, 6]),
+            submitter: SupportedAccountId::Polkadot(legal_officer_id(1)),
+        };
+		assert_err!(LogionLoc::add_metadata(RuntimeOrigin::signed(legal_officer_id(1)), LOC_ID, metadata.clone()), Error::<Test>::LocMetadataTooMuchData);
+    });
+}
+
+#[test]
 fn it_nominates_an_issuer() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
@@ -2294,7 +2312,7 @@ fn it_creates_ethereum_identity_loc() {
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: legal_officer_id(1),
             requester: OtherAccount(requester_account_id.clone()),
-            metadata: vec![],
+            metadata: BoundedVec::new(),
             files: vec![],
             closed: false,
             loc_type: LocType::Identity,
@@ -2329,7 +2347,7 @@ fn it_creates_polkadot_identity_loc() {
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: legal_officer_id(1),
             requester: Account(LOC_REQUESTER_ID),
-            metadata: vec![],
+            metadata: BoundedVec::new(),
             files: vec![],
             closed: false,
             loc_type: LocType::Identity,
@@ -2477,7 +2495,7 @@ fn it_reserves_value_fees() {
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: legal_officer_id(1),
             requester: LOC_REQUESTER,
-            metadata: vec![],
+            metadata: BoundedVec::new(),
             files: vec![],
             closed: false,
             loc_type: LocType::Collection,

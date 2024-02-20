@@ -96,6 +96,7 @@ pub const INVITED_CONTRIBUTOR_ID: u64 = 10;
 pub type OuterOrigin<T> = <T as frame_system::Config>::RuntimeOrigin;
 #[cfg(feature = "runtime-benchmarks")]
 use frame_system::RawOrigin;
+use scale_info::TypeInfo;
 use crate::weights::SubstrateWeight;
 
 pub struct LoAuthorityListMock;
@@ -126,14 +127,11 @@ impl IsLegalOfficer<<Test as system::Config>::AccountId, RuntimeOrigin> for LoAu
     }
 }
 
+pub const MAX_LOC_ITEMS: u8 = 3;
+
 parameter_types! {
-    pub const MaxCollectionItemDescriptionSize: usize = 4096;
-    pub const MaxCollectionItemTokenIdSize: usize = 255;
-    pub const MaxCollectionItemTokenTypeSize: usize = 255;
-    pub const MaxTokensRecordDescriptionSize: u32 = 255;
-    pub const MaxFileNameSize: u32 = 255;
-    pub const MaxFileContentTypeSize: u32 = 255;
-    pub const MaxIssuers: u32 = 2;
+	#[derive(Debug, Eq, Clone, PartialEq, TypeInfo)]
+	pub const MaxLocItems: u32 = MAX_LOC_ITEMS as u32;
     pub const MaxTokensRecordFiles: u32 = 10;
 }
 
@@ -216,13 +214,8 @@ impl pallet_loc::Config for Test {
     type Hasher = SHA256;
     type IsLegalOfficer = LoAuthorityListMock;
     type CollectionItemId = H256;
-    type MaxCollectionItemDescriptionSize = MaxCollectionItemDescriptionSize;
-    type MaxCollectionItemTokenIdSize = MaxCollectionItemTokenIdSize;
-    type MaxCollectionItemTokenTypeSize = MaxCollectionItemTokenTypeSize;
     type TokensRecordId = H256;
-    type MaxTokensRecordDescriptionSize = MaxTokensRecordDescriptionSize;
-    type MaxFileNameSize = MaxFileNameSize;
-    type MaxFileContentTypeSize = MaxFileContentTypeSize;
+	type MaxLocMetadata = MaxLocItems;
     type MaxTokensRecordFiles = MaxTokensRecordFiles;
     type WeightInfo = SubstrateWeight<Test>;
     type Currency = Balances;

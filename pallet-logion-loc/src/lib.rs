@@ -26,6 +26,7 @@ use scale_info::TypeInfo;
 use logion_shared::LegalOfficerCaseSummary;
 use crate::Requester::Account;
 use frame_system::pallet_prelude::BlockNumberFor;
+use sp_core::Get;
 #[cfg(feature = "runtime-benchmarks")]
 use sp_core::H160;
 use sp_std::{
@@ -217,10 +218,10 @@ impl<AccountId, EthereumAddress> Default for SupportedAccountId<AccountId, Ether
 pub type CollectionSize = u32;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
-pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance> {
+pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance, MaxLocMetadata: Get<u32>> {
     owner: AccountId,
     requester: Requester<AccountId, LocId, EthereumAddress>,
-    metadata: Vec<MetadataItem<AccountId, EthereumAddress, Hash>>,
+    metadata: BoundedVec<MetadataItem<AccountId, EthereumAddress, Hash>, MaxLocMetadata>,
     files: Vec<File<Hash, AccountId, EthereumAddress>>,
     closed: bool,
     loc_type: LocType,
@@ -238,13 +239,14 @@ pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress
     tokens_record_fee: Balance,
 }
 
-impl<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance>
-LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance>
+impl<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance, MaxLocMetadata>
+LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance, MaxLocMetadata>
 where
     AccountId: PartialEq + Clone,
     Hash: PartialEq + Copy + Ord,
     LocId: PartialEq + Copy + Ord,
     EthereumAddress: PartialEq + Clone,
+	MaxLocMetadata: Get<u32>,
 {
 
     pub fn ensure_can_add<T: pallet::Config>(&self, items: &ItemsParams<LocId, AccountId, EthereumAddress, Hash>) -> Result<(), sp_runtime::DispatchError> {
@@ -315,20 +317,24 @@ where
         Ok(())
     }
 
-    pub fn add_items(&mut self, origin: &AccountId, items: &ItemsParams<LocId, AccountId, EthereumAddress, Hash>) -> () {
-        items.metadata.iter().for_each(|item| self.add_metadata(origin, item));
+    pub fn add_items<T: pallet::Config>(&mut self, origin: &AccountId, items: &ItemsParams<LocId, AccountId, EthereumAddress, Hash>) -> Result<(), sp_runtime::DispatchError> {
+		for item in items.metadata.iter() {
+			self.add_metadata::<T>(origin, item)?;
+		}
         items.files.iter().for_each(|item| self.add_file(origin, item));
         items.links.iter().for_each(|item| self.add_link(origin, item));
+		Ok(())
     }
 
-    pub fn add_metadata(&mut self, origin: &AccountId, item: &MetadataItemParams<AccountId, EthereumAddress, Hash>) -> () {
-        self.metadata.push(MetadataItem {
+    pub fn add_metadata<T: pallet::Config>(&mut self, origin: &AccountId, item: &MetadataItemParams<AccountId, EthereumAddress, Hash>) -> Result<(), sp_runtime::DispatchError> {
+        self.metadata.try_push(MetadataItem {
             name: item.name,
             value: item.value,
             submitter: item.submitter.clone(),
             acknowledged_by_owner: self.is_owner(origin),
             acknowledged_by_verified_issuer: false,
-        });
+        }).map_err(|_| Error::<T>::LocMetadataTooMuchData)?;
+		Ok(())
     }
 
     pub fn is_owner(&self, origin: &AccountId) -> bool {
@@ -384,6 +390,7 @@ pub type LegalOfficerCaseOf<T> = LegalOfficerCase<
     <T as pallet::Config>::EthereumAddress,
     <T as pallet::Config>::SponsorshipId,
     BalanceOf<T>,
+	<T as pallet::Config>::MaxLocMetadata,
 >;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
@@ -489,7 +496,7 @@ pub trait Hasher<Hash> {
 
 #[frame_support::pallet]
 pub mod pallet {
-    use sp_std::collections::btree_set::BTreeSet;
+	use sp_std::collections::btree_set::BTreeSet;
     use frame_system::pallet_prelude::*;
     use frame_support::{
         dispatch::DispatchResultWithPostInfo,
@@ -525,29 +532,14 @@ pub mod pallet {
         /// Collection item identifier
         type CollectionItemId: Member + Parameter + Default + Copy;
 
-        /// The maximum size of a Collection Item description
-        type MaxCollectionItemDescriptionSize: Get<usize>;
-
-        /// The maximum size of a Collection Item Token Type
-        type MaxCollectionItemTokenTypeSize: Get<usize>;
-
-        /// The maximum size of a Collection Item Token ID
-        type MaxCollectionItemTokenIdSize: Get<usize>;
-
         /// Query for checking that a signer is a legal officer
         type IsLegalOfficer: IsLegalOfficer<Self::AccountId, Self::RuntimeOrigin>;
 
         /// Token Record identifier
         type TokensRecordId: Member + Parameter + Default + Copy;
 
-        /// The maximum size of a Token Record description
-        type MaxTokensRecordDescriptionSize: Get<u32>;
-
-        /// The maximum size of a file name
-        type MaxFileNameSize: Get<u32>;
-
-        /// The maximum size of a file's content type
-        type MaxFileContentTypeSize: Get<u32>;
+        /// The maximum number of metadata items per LOC
+        type MaxLocMetadata: Get<u32> + TypeInfo;
 
         /// The maximum number of files per token record
         type MaxTokensRecordFiles: Get<u32>;
@@ -850,6 +842,8 @@ pub mod pallet {
         CannotCloseUnacknowledgedByVerifiedIssuer,
 		/// The provided Polkadot account has no closed, non-void identity LOC
 		AccountNotIdentified,
+		/// There are too much metadata in the LOC
+		LocMetadataTooMuchData
     }
 
     #[pallet::hooks]
@@ -894,11 +888,12 @@ pub mod pallet {
         V20AddCustomLegalFee,
         V21EnableRequesterLinks,
         V22AddRecurrentFees,
+        V23BoundedLocItems,
     }
 
     impl Default for StorageVersion {
         fn default() -> StorageVersion {
-            return StorageVersion::V22AddRecurrentFees;
+            return StorageVersion::V23BoundedLocItems;
         }
     }
 
@@ -935,7 +930,7 @@ pub mod pallet {
                     .map(|file| file.size)
                     .fold(0, |tot, current| tot + current);
                 Self::apply_file_storage_fee(&requester_account_id, items.files.len(), tot_size)?;
-                loc.add_items(&requester_account_id, &items);
+                loc.add_items::<T>(&requester_account_id, &items)?;
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
@@ -995,7 +990,7 @@ pub mod pallet {
                     .map(|file| file.size)
                     .fold(0, |tot, current| tot + current);
                 Self::apply_file_storage_fee(&requester_account_id, items.files.len(), tot_size)?;
-                loc.add_items(&requester_account_id, &items);
+                loc.add_items::<T>(&requester_account_id, &items)?;
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
@@ -1086,7 +1081,7 @@ pub mod pallet {
                     .map(|file| file.size)
                     .fold(0, |tot, current| tot + current);
                 Self::apply_file_storage_fee(&requester_account_id, items.files.len(), tot_size)?;
-                loc.add_items(&requester_account_id, &items);
+                loc.add_items::<T>(&requester_account_id, &items)?;
 
                 Self::apply_legal_fee(&loc)?;
                 if value_fee > 0_u32.into() {
@@ -1124,10 +1119,10 @@ pub mod pallet {
                     Err(Error::<T>::CannotMutateVoid)?
                 } else {
                     loc.ensure_can_add_metadata::<T>(&Vec::from([item.clone()]))?;
-                    <LocMap<T>>::mutate(loc_id, |loc| {
+                    <LocMap<T>>::try_mutate(loc_id, |loc| {
                         let mutable_loc = loc.as_mut().unwrap();
-                        mutable_loc.add_metadata(&who, &item);
-                    });
+                        mutable_loc.add_metadata::<T>(&who, &item)
+                    })?;
                     Ok(().into())
                 }
             }
@@ -1945,7 +1940,7 @@ pub mod pallet {
             LegalOfficerCaseOf::<T> {
                 owner: legal_officer.clone(),
                 requester: requester.clone(),
-                metadata: Vec::new(),
+                metadata: BoundedVec::new(),
                 files: Vec::new(),
                 closed: false,
                 loc_type: loc_type.clone(),
@@ -1978,7 +1973,7 @@ pub mod pallet {
             LegalOfficerCaseOf::<T> {
                 owner: who.clone(),
                 requester: requester.clone(),
-                metadata: Vec::new(),
+                metadata: BoundedVec::new(),
                 files: Vec::new(),
                 closed: false,
                 loc_type: LocType::Collection,
