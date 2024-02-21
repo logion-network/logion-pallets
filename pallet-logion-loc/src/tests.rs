@@ -10,13 +10,7 @@ use sp_runtime::traits::Hash;
 
 use logion_shared::{Beneficiary, LocQuery, LocValidity};
 
-use crate::{
-	CollectionItem, CollectionItemFile, CollectionItemToken, Config, Error, fees::*, File,
-	FileParams, Hasher, ItemsParams, ItemsParamsOf,
-	LegalOfficerCase, LocLink, LocLinkParams, LocType, MetadataItem, MetadataItemParams,
-	mock::*, OtherAccountId, Requester::{Account, OtherAccount}, SupportedAccountId, TermsAndConditionsElement,
-	TokensRecordFile, TokensRecordFileOf, VerifiedIssuer,
-};
+use crate::{CollectionItem, CollectionItemFile, CollectionItemToken, Config, Error, fees::*, File, FileParams, Hasher, ItemsParams, ItemsParamsOf, LegalOfficerCase, LocLink, LocLinkParams, LocType, MetadataItem, MetadataItemParams, mock::*, OtherAccountId, Requester::{Account, OtherAccount}, SupportedAccountId, TermsAndConditionsElement, TokensRecordFile, TokensRecordFileOf, VerifiedIssuer};
 
 const LOC_ID: u32 = 0;
 const OTHER_LOC_ID: u32 = 1;
@@ -48,7 +42,7 @@ fn it_creates_loc_with_default_legal_fee() {
             owner: legal_officer_id(1),
             requester: LOC_REQUESTER,
             metadata: BoundedVec::new(),
-            files: vec![],
+            files: BoundedVec::new(),
             closed: false,
             loc_type: LocType::Transaction,
             links: vec![],
@@ -96,7 +90,7 @@ fn it_creates_loc_with_custom_legal_fee() {
             owner: legal_officer_id(1),
             requester: LOC_REQUESTER,
             metadata: BoundedVec::new(),
-            files: vec![],
+            files: BoundedVec::new(),
             closed: false,
             loc_type: LocType::Transaction,
             links: vec![],
@@ -994,6 +988,7 @@ fn add_metadata(name: u8, submitter: u64) -> MetadataItemParams<AccountId, Ether
     assert_ok!(LogionLoc::add_metadata(RuntimeOrigin::signed(submitter), LOC_ID, metadata.clone()));
     metadata
 }
+
 fn add_file(content: &str, submitter: u64) -> FileParams<H256, AccountId, EthereumAddress> {
     let file = FileParams {
         hash: sha256(&content.as_bytes().to_vec()),
@@ -1207,7 +1202,7 @@ fn it_creates_collection_loc() {
             owner: legal_officer_id(1),
             requester: LOC_REQUESTER,
             metadata: BoundedVec::new(),
-            files: vec![],
+            files: BoundedVec::new(),
             closed: false,
             loc_type: LocType::Collection,
             links: vec![],
@@ -1771,6 +1766,24 @@ fn it_fails_to_add_too_much_metadata() {
 }
 
 #[test]
+fn it_fails_to_add_too_much_files() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        assert_ok!(create_identity_and_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, legal_officer_id(1), OTHER_LOC_DEFAULT_LEGAL_FEE, ItemsParams::empty()));
+		for i in 0..MAX_LOC_ITEMS {
+			let _ = add_file(&i.to_string(), LOC_REQUESTER_ID);
+		}
+		let file = FileParams {
+			hash: sha256(&"abcde".as_bytes().to_vec()),
+			nature: sha256(&"test-file-nature".as_bytes().to_vec()),
+			submitter: SupportedAccountId::Polkadot(legal_officer_id(1)),
+			size: FILE_SIZE,
+		};
+		assert_err!(LogionLoc::add_file(RuntimeOrigin::signed(legal_officer_id(1)), LOC_ID, file.clone()), Error::<Test>::LocFilesTooMuchData);
+    });
+}
+
+#[test]
 fn it_nominates_an_issuer() {
     new_test_ext().execute_with(|| {
         setup_default_balances();
@@ -2313,7 +2326,7 @@ fn it_creates_ethereum_identity_loc() {
             owner: legal_officer_id(1),
             requester: OtherAccount(requester_account_id.clone()),
             metadata: BoundedVec::new(),
-            files: vec![],
+            files: BoundedVec::new(),
             closed: false,
             loc_type: LocType::Identity,
             links: vec![],
@@ -2348,7 +2361,7 @@ fn it_creates_polkadot_identity_loc() {
             owner: legal_officer_id(1),
             requester: Account(LOC_REQUESTER_ID),
             metadata: BoundedVec::new(),
-            files: vec![],
+            files: BoundedVec::new(),
             closed: false,
             loc_type: LocType::Identity,
             links: vec![],
@@ -2496,7 +2509,7 @@ fn it_reserves_value_fees() {
             owner: legal_officer_id(1),
             requester: LOC_REQUESTER,
             metadata: BoundedVec::new(),
-            files: vec![],
+            files: BoundedVec::new(),
             closed: false,
             loc_type: LocType::Collection,
             links: vec![],

@@ -60,7 +60,7 @@ pub mod v23 {
                             owner: loc.owner,
                             requester: loc.requester,
                             metadata: BoundedVec::try_from(loc.metadata).expect("Failed to migrate metadata"),
-                            files: loc.files,
+                            files: BoundedVec::try_from(loc.files).expect("Failed to migrate files"),
                             closed: loc.closed,
                             loc_type: loc.loc_type,
                             links: loc.links,
