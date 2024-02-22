@@ -132,6 +132,8 @@ pub const MAX_LOC_ITEMS: u8 = 3;
 parameter_types! {
 	#[derive(Debug, Eq, Clone, PartialEq, TypeInfo)]
 	pub const MaxLocItems: u32 = MAX_LOC_ITEMS as u32;
+    pub const MaxCollectionItemFiles: u32 = 2;
+    pub const MaxCollectionItemTCs: u32 = 2;
     pub const MaxTokensRecordFiles: u32 = 10;
 }
 
@@ -218,6 +220,8 @@ impl pallet_loc::Config for Test {
 	type MaxLocMetadata = MaxLocItems;
 	type MaxLocFiles = MaxLocItems;
 	type MaxLocLinks = MaxLocItems;
+	type MaxCollectionItemFiles = MaxCollectionItemFiles;
+	type MaxCollectionItemTCs = MaxCollectionItemTCs;
     type MaxTokensRecordFiles = MaxTokensRecordFiles;
     type WeightInfo = SubstrateWeight<Test>;
     type Currency = Balances;

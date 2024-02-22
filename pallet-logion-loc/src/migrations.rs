@@ -44,6 +44,21 @@ pub mod v23 {
         BalanceOf<T>,
     >;
 
+	#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+	pub struct CollectionItemV22<Hash, LocId, TokenIssuance> {
+		description: Hash,
+		files: Vec<CollectionItemFile<Hash>>,
+		token: Option<CollectionItemToken<TokenIssuance, Hash>>,
+		restricted_delivery: bool,
+		terms_and_conditions: Vec<TermsAndConditionsElement<LocId, Hash>>,
+	}
+
+	pub type CollectionItemV22Of<T> = CollectionItemV22<
+		<T as pallet::Config>::Hash,
+		<T as pallet::Config>::LocId,
+		<T as pallet::Config>::TokenIssuance,
+	>;
+
     pub struct BoundedLocItems<T>(sp_std::marker::PhantomData<T>);
 
     impl<T: Config> OnRuntimeUpgrade for BoundedLocItems<T>
@@ -76,7 +91,18 @@ pub mod v23 {
                             collection_item_fee: loc.collection_item_fee,
                             tokens_record_fee: loc.tokens_record_fee,
                         })
-                    })
+                    });
+
+					CollectionItemsMap::<T>::translate_values(| collection_item: CollectionItemV22Of<T> | {
+						Some(CollectionItemOf::<T>{
+							description: collection_item.description,
+							files: BoundedVec::try_from(collection_item.files).expect("Failed to migrate collection item files"),
+							token: collection_item.token,
+							restricted_delivery: collection_item.restricted_delivery,
+							terms_and_conditions: BoundedVec::try_from(collection_item.terms_and_conditions).expect("Failed to migrate collection item T&C"),
+
+						})
+					})
                 }
             )
         }

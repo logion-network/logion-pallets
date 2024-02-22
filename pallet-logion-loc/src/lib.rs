@@ -411,19 +411,31 @@ pub struct TermsAndConditionsElement<LocId, Hash> {
     details: Hash,
 }
 
+pub type TermsAndConditionsElementOf<T> = TermsAndConditionsElement<
+	<T as pallet::Config>::LocId,
+	<T as pallet::Config>::Hash,
+>;
+
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
-pub struct CollectionItem<Hash, LocId, TokenIssuance> {
+pub struct CollectionItem<Hash, TokenIssuance, BoundedCollectionItemFilesList, BoundedCollectionItemTCList> {
     description: Hash,
-    files: Vec<CollectionItemFile<Hash>>,
+    files: BoundedCollectionItemFilesList,
     token: Option<CollectionItemToken<TokenIssuance, Hash>>,
     restricted_delivery: bool,
-    terms_and_conditions: Vec<TermsAndConditionsElement<LocId, Hash>>,
+    terms_and_conditions: BoundedCollectionItemTCList,
 }
 
 pub type CollectionItemOf<T> = CollectionItem<
     <T as pallet::Config>::Hash,
-    <T as pallet::Config>::LocId,
     <T as pallet::Config>::TokenIssuance,
+	BoundedVec<
+		CollectionItemFileOf<T>,
+		<T as pallet::Config>::MaxCollectionItemFiles
+	>,
+	BoundedVec<
+		TermsAndConditionsElementOf<T>,
+		<T as pallet::Config>::MaxCollectionItemTCs
+	>,
 >;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
@@ -557,6 +569,12 @@ pub mod pallet {
 
         /// The maximum number of links per LOC
         type MaxLocLinks: Get<u32> + TypeInfo;
+
+        /// The maximum number of files per collection item
+        type MaxCollectionItemFiles: Get<u32>;
+
+        /// The maximum number of files per collection item
+        type MaxCollectionItemTCs: Get<u32>;
 
         /// The maximum number of files per token record
         type MaxTokensRecordFiles: Get<u32>;
@@ -865,6 +883,10 @@ pub mod pallet {
 		LocFilesTooMuchData,
 		/// There are too much links in the LOC
 		LocLinksTooMuchData,
+		/// There are too much files in the Collection Item
+		CollectionItemFilesTooMuchData,
+		/// There are too much terms and conditions in the Collection Item
+		CollectionItemTCsTooMuchData,
     }
 
     #[pallet::hooks]
@@ -2101,12 +2123,16 @@ pub mod pallet {
                         .map(|file| file.size)
                         .fold(0, |tot, current| tot + current);
                     Self::apply_file_storage_fee(&who, item_files.len(), tot_size)?;
-                    let item = CollectionItem {
+					let bounded_files: BoundedVec<CollectionItemFileOf<T>, T::MaxCollectionItemFiles> = BoundedVec::try_from(item_files)
+						.map_err(|_| Error::<T>::CollectionItemFilesTooMuchData)?;
+					let bounded_tcs: BoundedVec<TermsAndConditionsElementOf<T>, T::MaxCollectionItemTCs> = BoundedVec::try_from(terms_and_conditions)
+						.map_err(|_| Error::<T>::CollectionItemTCsTooMuchData)?;
+					let item = CollectionItem {
                         description: item_description,
-                        files: item_files,
+                        files: bounded_files,
                         token: item_token.clone(),
                         restricted_delivery,
-                        terms_and_conditions,
+                        terms_and_conditions: bounded_tcs,
                     };
                     <CollectionItemsMap<T>>::insert(collection_loc_id, item_id, item);
                     let collection_size = <CollectionSizeMap<T>>::get(&collection_loc_id).unwrap_or(0);
