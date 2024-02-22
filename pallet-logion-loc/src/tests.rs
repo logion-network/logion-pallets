@@ -2396,7 +2396,8 @@ fn it_creates_ethereum_identity_loc() {
             collection_item_fee: 0,
             tokens_record_fee: 0,
         }));
-        assert_eq!(LogionLoc::other_account_locs(requester_account_id), Some(vec![LOC_ID]));
+		let loc_ids = BoundedVec::try_from(vec![LOC_ID]).expect("Failed to create expected BoundedVec");
+        assert_eq!(LogionLoc::other_account_locs(requester_account_id), Some(loc_ids));
         assert_eq!(LogionLoc::sponsorship(sponsorship_id).unwrap().loc_id, Some(LOC_ID));
         System::assert_has_event(RuntimeEvent::LogionLoc(crate::Event::LocCreated { 0: LOC_ID }));
 
@@ -2431,7 +2432,8 @@ fn it_creates_polkadot_identity_loc() {
             collection_item_fee: 0,
             tokens_record_fee: 0,
         }));
-        assert_eq!(LogionLoc::account_locs(LOC_REQUESTER_ID), Some(vec![LOC_ID]));
+		let loc_ids = BoundedVec::try_from(vec![LOC_ID]).expect("Failed to create expected BoundedVec");
+        assert_eq!(LogionLoc::account_locs(LOC_REQUESTER_ID), Some(loc_ids));
         System::assert_has_event(RuntimeEvent::LogionLoc(crate::Event::LocCreated { 0: LOC_ID }));
 
         let fees = Fees::only_legal(160 * ONE_LGNT, Beneficiary::Other);
@@ -2838,6 +2840,50 @@ fn it_creates_identity_loc_with_initial_metadata() {
         assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, legal_officer_id(1), ID_LOC_DEFAULT_LEGAL_FEE, ItemsParams::only_metadata(Vec::from([ metadata.clone() ]))));
         let loc = LogionLoc::loc(LOC_ID).unwrap();
         assert_eq!(loc.metadata[0], expected_metadata(metadata, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_to_create_too_much_identity_locs() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+		for i in 0u32..MaxAccountLocs::get() {
+			assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), i, legal_officer_id(1), 0, ItemsParams::empty()));
+		}
+		assert_err!(
+			LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), MaxAccountLocs::get(), legal_officer_id(1), ID_LOC_DEFAULT_LEGAL_FEE, ItemsParams::empty()),
+			Error::<Test>::AccountLocsTooMuchData
+		);
+    });
+}
+
+#[test]
+fn it_fails_to_create_too_much_transaction_locs() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+		create_closed_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), 0);
+		for i in 1u32..MaxAccountLocs::get() {
+			assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), i, legal_officer_id(1), 0, ItemsParams::empty()));
+		}
+		assert_err!(
+			LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), MaxAccountLocs::get(), legal_officer_id(1), OTHER_LOC_DEFAULT_LEGAL_FEE, ItemsParams::empty()),
+			Error::<Test>::AccountLocsTooMuchData
+		);
+    });
+}
+
+#[test]
+fn it_fails_to_create_too_much_collection_locs() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+		create_closed_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), 0);
+		for i in 1u32..MaxAccountLocs::get() {
+			assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), i, legal_officer_id(1), None, Some(10), false, 0, 0, 0, 0, ItemsParams::empty()));
+		}
+		assert_err!(
+			LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), MaxAccountLocs::get(), legal_officer_id(1), None, Some(10), false, 0, 0, 0, 0, ItemsParams::empty()),
+			Error::<Test>::AccountLocsTooMuchData
+		);
     });
 }
 

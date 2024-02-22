@@ -102,7 +102,19 @@ pub mod v23 {
 							terms_and_conditions: BoundedVec::try_from(collection_item.terms_and_conditions).expect("Failed to migrate collection item T&C"),
 
 						})
-					})
+					});
+
+					AccountLocsMap::<T>::translate_values(| loc_ids: Vec<<T as Config>::LocId> | {
+						Some(BoundedVec::try_from(loc_ids).expect("Failed to migrate IdentityLocLocsMap"))
+					});
+
+					IdentityLocLocsMap::<T>::translate_values(| loc_ids: Vec<<T as Config>::LocId> | {
+						Some(BoundedVec::try_from(loc_ids).expect("Failed to migrate IdentityLocLocsMap"))
+					});
+
+					OtherAccountLocsMap::<T>::translate_values(| loc_ids: Vec<<T as Config>::LocId> | {
+						Some(BoundedVec::try_from(loc_ids).expect("Failed to migrate IdentityLocLocsMap"))
+					});
                 }
             )
         }

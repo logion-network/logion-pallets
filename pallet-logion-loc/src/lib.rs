@@ -16,7 +16,7 @@ mod tests;
 
 mod benchmarking;
 
-use codec::{Decode, Encode};
+use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::{
     BoundedVec,
     sp_runtime::Saturating,
@@ -43,7 +43,7 @@ use benchmarking::{
 	SponsorshipIdFactory,
 };
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen, Copy)]
 pub enum LocType {
     Transaction,
     Identity,
@@ -56,7 +56,7 @@ impl Default for LocType {
     }
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct MetadataItem<AccountId, EthereumAddress, Hash> {
     name: Hash,
     value: Hash,
@@ -65,7 +65,7 @@ pub struct MetadataItem<AccountId, EthereumAddress, Hash> {
     acknowledged_by_verified_issuer: bool,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct MetadataItemParams<AccountId, EthereumAddress, Hash> {
     name: Hash,
     value: Hash,
@@ -78,7 +78,7 @@ pub type MetadataItemParamsOf<T> = MetadataItemParams<
 	<T as pallet::Config>::Hash,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct LocLink<LocId, Hash, AccountId, EthereumAddress> {
     id: LocId,
     nature: Hash,
@@ -87,7 +87,7 @@ pub struct LocLink<LocId, Hash, AccountId, EthereumAddress> {
     acknowledged_by_verified_issuer: bool,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct LocLinkParams<LocId, Hash, AccountId, EthereumAddress> {
     id: LocId,
     nature: Hash,
@@ -101,7 +101,7 @@ pub type LocLinkParamsOf<T> = LocLinkParams<
 	<T as pallet::Config>::EthereumAddress,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct File<Hash, AccountId, EthereumAddress> {
     hash: Hash,
     nature: Hash,
@@ -111,7 +111,7 @@ pub struct File<Hash, AccountId, EthereumAddress> {
     acknowledged_by_verified_issuer: bool,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct FileParams<Hash, AccountId, EthereumAddress> {
     hash: Hash,
     nature: Hash,
@@ -125,7 +125,7 @@ pub type FileParamsOf<T> = FileParams<
 	<T as pallet::Config>::EthereumAddress,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct ItemsParams<LocId, AccountId, EthereumAddress, Hash> {
     metadata: Vec<MetadataItemParams<AccountId, EthereumAddress, Hash>>,
     files: Vec<FileParams<Hash, AccountId, EthereumAddress>>,
@@ -174,17 +174,17 @@ pub type ItemsParamsOf<T> = ItemsParams<
     <T as pallet::Config>::Hash,
 >;
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct LocVoidInfo<LocId> {
     replacer: Option<LocId>,
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen, Copy)]
 pub enum OtherAccountId<EthereumAddress> {
     Ethereum(EthereumAddress)
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub enum Requester<AccountId, LocId, EthereumAddress> {
     None,
     Account(AccountId),
@@ -201,7 +201,7 @@ impl<AccountId, LocId, EthereumAddress> Default for Requester<AccountId, LocId, 
     }
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen, Copy)]
 pub enum SupportedAccountId<AccountId, EthereumAddress> {
     None, // Enables "null" account ID
     Polkadot(AccountId),
@@ -217,7 +217,7 @@ impl<AccountId, EthereumAddress> Default for SupportedAccountId<AccountId, Ether
 
 pub type CollectionSize = u32;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance,
 	MaxLocMetadata: Get<u32>, MaxLocFiles: Get<u32>, MaxLocLinks: Get<u32>> {
     owner: AccountId,
@@ -404,7 +404,7 @@ pub type LegalOfficerCaseOf<T> = LegalOfficerCase<
 	<T as pallet::Config>::MaxLocLinks,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct TermsAndConditionsElement<LocId, Hash> {
     tc_type: Hash,
     tc_loc: LocId,
@@ -416,7 +416,7 @@ pub type TermsAndConditionsElementOf<T> = TermsAndConditionsElement<
 	<T as pallet::Config>::Hash,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct CollectionItem<Hash, TokenIssuance, BoundedCollectionItemFilesList, BoundedCollectionItemTCList> {
     description: Hash,
     files: BoundedCollectionItemFilesList,
@@ -438,7 +438,7 @@ pub type CollectionItemOf<T> = CollectionItem<
 	>,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct CollectionItemFile<Hash> {
     name: Hash,
     content_type: Hash,
@@ -448,14 +448,14 @@ pub struct CollectionItemFile<Hash> {
 
 pub type CollectionItemFileOf<T> = CollectionItemFile<<T as pallet::Config>::Hash>;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct CollectionItemToken<TokenIssuance, Hash> {
     token_type: Hash,
     token_id: Hash,
     token_issuance: TokenIssuance,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct VerifiedIssuer<LocId> {
     identity_loc: LocId,
 }
@@ -464,7 +464,7 @@ pub type VerifiedIssuerOf<T> = VerifiedIssuer<
     <T as pallet::Config>::LocId,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct TokensRecord<Hash, BoundedTokensRecordFilesList, AccountId> {
     description: Hash,
     files: BoundedTokensRecordFilesList,
@@ -480,7 +480,7 @@ pub type TokensRecordOf<T> = TokensRecord<
     <T as frame_system::Config>::AccountId,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct TokensRecordFile<Hash> {
     name: Hash,
     content_type: Hash,
@@ -496,7 +496,7 @@ pub type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system:
 
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId, >>::NegativeImbalance;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct Sponsorship<AccountId, EthereumAddress, LocId> {
     sponsor: AccountId,
     sponsored_account: SupportedAccountId<AccountId, EthereumAddress>,
@@ -538,10 +538,10 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// LOC identifier
-        type LocId: Member + Parameter + Default + Copy + HasCompact + Ord;
+        type LocId: Member + Parameter + Default + Copy + HasCompact + Ord + MaxEncodedLen;
 
         /// Type for hashes stored in LOCs
-        type Hash: Member + Parameter + Default + Copy + Ord;
+        type Hash: Member + Parameter + Default + Copy + Ord + MaxEncodedLen;
 
         /// Type for hasher
         type Hasher: Hasher<<Self as pallet::Config>::Hash>;
@@ -553,13 +553,16 @@ pub mod pallet {
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Collection item identifier
-        type CollectionItemId: Member + Parameter + Default + Copy;
+        type CollectionItemId: Member + Parameter + Default + Copy + MaxEncodedLen;
 
         /// Query for checking that a signer is a legal officer
         type IsLegalOfficer: IsLegalOfficer<Self::AccountId, Self::RuntimeOrigin>;
 
         /// Token Record identifier
-        type TokensRecordId: Member + Parameter + Default + Copy;
+        type TokensRecordId: Member + Parameter + Default + Copy + MaxEncodedLen;
+
+		/// The maximum number of LOCs per account
+		type MaxAccountLocs: Get<u32>;
 
         /// The maximum number of metadata items per LOC
         type MaxLocMetadata: Get<u32> + TypeInfo;
@@ -595,10 +598,10 @@ pub mod pallet {
         type FileStorageFeeDistributionKey: Get<DistributionKey>;
 
         /// Ethereum Address type
-        type EthereumAddress: Member + Parameter + Default + Copy;
+        type EthereumAddress: Member + Parameter + Default + Copy + MaxEncodedLen;
 
         /// The identifier of a sponsorship
-        type SponsorshipId: Member + Parameter + Default + Copy + HasCompact;
+        type SponsorshipId: Member + Parameter + Default + Copy + HasCompact + MaxEncodedLen;
 
         /// The certificate fee per issued token
         type CertificateFee: Get<BalanceOf<Self>>;
@@ -649,7 +652,6 @@ pub mod pallet {
     }
 
     #[pallet::pallet]
-    #[pallet::without_storage_info]
     pub struct Pallet<T>(_);
 
     /// All LOCs indexed by ID.
@@ -660,17 +662,17 @@ pub mod pallet {
     /// Requested LOCs by account ID.
     #[pallet::storage]
     #[pallet::getter(fn account_locs)]
-    pub type AccountLocsMap<T> = StorageMap<_, Blake2_128Concat, <T as frame_system::Config>::AccountId, Vec<<T as Config>::LocId>>;
+    pub type AccountLocsMap<T> = StorageMap<_, Blake2_128Concat, <T as frame_system::Config>::AccountId, BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs>>;
 
     /// Requested LOCs by logion Identity LOC.
     #[pallet::storage]
     #[pallet::getter(fn identity_loc_locs)]
-    pub type IdentityLocLocsMap<T> = StorageMap<_, Blake2_128Concat, <T as Config>::LocId, Vec<<T as Config>::LocId>>;
+    pub type IdentityLocLocsMap<T> = StorageMap<_, Blake2_128Concat, <T as Config>::LocId, BoundedVec<<T as crate::pallet::Config>::LocId, <T as Config>::MaxAccountLocs>>;
 
     /// Requested LOCs by other requester.
     #[pallet::storage]
     #[pallet::getter(fn other_account_locs)]
-    pub type OtherAccountLocsMap<T> = StorageMap<_, Blake2_128Concat, OtherAccountId<<T as Config>::EthereumAddress>, Vec<<T as Config>::LocId>>;
+    pub type OtherAccountLocsMap<T> = StorageMap<_, Blake2_128Concat, OtherAccountId<<T as Config>::EthereumAddress>, BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs>>;
 
     /// Collection items by LOC ID.
     #[pallet::storage]
@@ -887,6 +889,8 @@ pub mod pallet {
 		CollectionItemFilesTooMuchData,
 		/// There are too much terms and conditions in the Collection Item
 		CollectionItemTCsTooMuchData,
+		/// There are too much LOCs linked to account
+		AccountLocsTooMuchData,
     }
 
     #[pallet::hooks]
@@ -907,7 +911,7 @@ pub mod pallet {
         }
     }
 
-    #[derive(Encode, Decode, Eq, PartialEq, Debug, TypeInfo)]
+    #[derive(Encode, Decode, Eq, PartialEq, Debug, TypeInfo, MaxEncodedLen)]
     pub enum StorageVersion {
         V1,
         V2MakeLocVoid,
@@ -977,7 +981,7 @@ pub mod pallet {
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
-                Self::link_with_account(&requester_account_id, &loc_id);
+                Self::link_with_account(&requester_account_id, &loc_id)?;
 
                 Self::deposit_event(Event::LocCreated(loc_id));
                 Ok(().into())
@@ -1037,7 +1041,7 @@ pub mod pallet {
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
-                Self::link_with_account(&requester_account_id, &loc_id);
+                Self::link_with_account(&requester_account_id, &loc_id)?;
 
                 Self::deposit_event(Event::LocCreated(loc_id));
                 Ok(().into())
@@ -1068,7 +1072,7 @@ pub mod pallet {
                             let requester = RequesterOf::<T>::Loc(requester_loc_id.clone());
                             let new_loc = Self::build_open_loc(&who, &requester, LocType::Transaction, None, BalanceOf::<T>::zero());
                             <LocMap<T>>::insert(loc_id, new_loc);
-                            Self::link_with_identity_loc(&requester_loc_id, &loc_id);
+                            Self::link_with_identity_loc(&requester_loc_id, &loc_id)?;
                         },
                 }
 
@@ -1132,7 +1136,7 @@ pub mod pallet {
                     T::Currency::reserve(&requester_account_id, value_fee)?
                 }
                 <LocMap<T>>::insert(loc_id, loc);
-                Self::link_with_account(&requester_account_id, &loc_id);
+                Self::link_with_account(&requester_account_id, &loc_id)?;
 
                 Self::deposit_event(Event::LocCreated(loc_id));
                 Ok(().into())
@@ -1463,7 +1467,7 @@ pub mod pallet {
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
-                Self::link_with_other_account(&requester_account_id, &loc_id);
+                Self::link_with_other_account(&requester_account_id, &loc_id)?;
                 Self::link_sponsorship_to_loc(&sponsorship_id, &loc_id);
 
                 Self::deposit_event(Event::LocCreated(loc_id));
@@ -1927,42 +1931,57 @@ pub mod pallet {
         fn link_with_account(
             account_id: &<T as frame_system::Config>::AccountId,
             loc_id: &<T as Config>::LocId,
-        ) {
+        ) -> Result<(), sp_runtime::DispatchError> {
             if <AccountLocsMap<T>>::contains_key(account_id) {
                 <AccountLocsMap<T>>::mutate(account_id, |locs| {
                     let list = locs.as_mut().unwrap();
-                    list.push(loc_id.clone());
-                });
+                    list.try_push(loc_id.clone())
+                }).map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
+				Ok(())
             } else {
-                <AccountLocsMap<T>>::insert(account_id, Vec::from([loc_id.clone()]));
+				let mut list: BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs> = BoundedVec::new();
+				list.try_push(loc_id.clone())
+					.map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
+				<AccountLocsMap<T>>::insert(account_id, list);
+				Ok(())
             }
         }
 
         fn link_with_identity_loc(
             requester_loc_id: &<T as Config>::LocId,
             loc_id: &<T as Config>::LocId,
-        ) {
+        ) -> Result<(), sp_runtime::DispatchError> {
             if <IdentityLocLocsMap<T>>::contains_key(requester_loc_id) {
                 <IdentityLocLocsMap<T>>::mutate(requester_loc_id, |locs| {
                     let list = locs.as_mut().unwrap();
-                    list.push(loc_id.clone());
-                });
+					list.try_push(loc_id.clone())
+                }).map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
+				Ok(())
             } else {
-                <IdentityLocLocsMap<T>>::insert(requester_loc_id, Vec::from([loc_id.clone()]));
+				let mut list: BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs> = BoundedVec::new();
+				list.try_push(loc_id.clone())
+					.map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
+                <IdentityLocLocsMap<T>>::insert(requester_loc_id, list);
+				Ok(())
             }
         }
 
         fn link_with_other_account(
             account_id: &OtherAccountId<T::EthereumAddress>,
             loc_id: &<T as Config>::LocId,
-        ) {
+        ) -> Result<(), sp_runtime::DispatchError> {
             if <OtherAccountLocsMap<T>>::contains_key(account_id) {
                 <OtherAccountLocsMap<T>>::mutate(account_id, |locs| {
                     let list = locs.as_mut().unwrap();
-                    list.push(loc_id.clone());
-                });
+					list.try_push(loc_id.clone())
+                }).map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
+				Ok(())
             } else {
-                <OtherAccountLocsMap<T>>::insert(account_id, Vec::from([loc_id.clone()]));
+				let mut list: BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs> = BoundedVec::new();
+				list.try_push(loc_id.clone())
+					.map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
+                <OtherAccountLocsMap<T>>::insert(account_id, list);
+				Ok(())
             }
         }
 
