@@ -63,7 +63,7 @@ pub mod v23 {
                             files: BoundedVec::try_from(loc.files).expect("Failed to migrate files"),
                             closed: loc.closed,
                             loc_type: loc.loc_type,
-                            links: loc.links,
+                            links: BoundedVec::try_from(loc.links).expect("Failed to migrate links"),
                             void_info: loc.void_info,
                             replacer_of: loc.replacer_of,
                             collection_last_block_submission: loc.collection_last_block_submission,

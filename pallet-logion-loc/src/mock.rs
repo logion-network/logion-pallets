@@ -217,6 +217,7 @@ impl pallet_loc::Config for Test {
     type TokensRecordId = H256;
 	type MaxLocMetadata = MaxLocItems;
 	type MaxLocFiles = MaxLocItems;
+	type MaxLocLinks = MaxLocItems;
     type MaxTokensRecordFiles = MaxTokensRecordFiles;
     type WeightInfo = SubstrateWeight<Test>;
     type Currency = Balances;

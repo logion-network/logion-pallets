@@ -219,14 +219,14 @@ pub type CollectionSize = u32;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance,
-	MaxLocMetadata: Get<u32>, MaxLocFiles: Get<u32>> {
+	MaxLocMetadata: Get<u32>, MaxLocFiles: Get<u32>, MaxLocLinks: Get<u32>> {
     owner: AccountId,
     requester: Requester<AccountId, LocId, EthereumAddress>,
     metadata: BoundedVec<MetadataItem<AccountId, EthereumAddress, Hash>, MaxLocMetadata>,
     files: BoundedVec<File<Hash, AccountId, EthereumAddress>, MaxLocFiles>,
     closed: bool,
     loc_type: LocType,
-    links: Vec<LocLink<LocId, Hash, AccountId, EthereumAddress>>,
+    links: BoundedVec<LocLink<LocId, Hash, AccountId, EthereumAddress>, MaxLocLinks>,
     void_info: Option<LocVoidInfo<LocId>>,
     replacer_of: Option<LocId>,
     collection_last_block_submission: Option<BlockNumber>,
@@ -240,8 +240,8 @@ pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress
     tokens_record_fee: Balance,
 }
 
-impl<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance, MaxLocMetadata, MaxLocFiles>
-LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance, MaxLocMetadata, MaxLocFiles>
+impl<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance, MaxLocMetadata, MaxLocFiles, MaxLocLinks>
+LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance, MaxLocMetadata, MaxLocFiles, MaxLocLinks>
 where
     AccountId: PartialEq + Clone,
     Hash: PartialEq + Copy + Ord,
@@ -249,6 +249,7 @@ where
     EthereumAddress: PartialEq + Clone,
 	MaxLocMetadata: Get<u32>,
 	MaxLocFiles: Get<u32>,
+	MaxLocLinks: Get<u32>,
 {
 
     pub fn ensure_can_add<T: pallet::Config>(&self, items: &ItemsParams<LocId, AccountId, EthereumAddress, Hash>) -> Result<(), sp_runtime::DispatchError> {
@@ -326,7 +327,9 @@ where
 		for item in items.files.iter() {
 			self.add_file::<T>(origin, item)?;
 		}
-        items.links.iter().for_each(|item| self.add_link(origin, item));
+		for item in items.links.iter() {
+			self.add_link::<T>(origin, item)?;
+		}
 		Ok(())
     }
 
@@ -357,14 +360,15 @@ where
 		Ok(())
     }
 
-    pub fn add_link(&mut self, origin: &AccountId, link: &LocLinkParams<LocId, Hash, AccountId, EthereumAddress>) -> () {
-        self.links.push(LocLink {
+    pub fn add_link<T: pallet::Config>(&mut self, origin: &AccountId, link: &LocLinkParams<LocId, Hash, AccountId, EthereumAddress>) -> Result<(), sp_runtime::DispatchError> {
+        self.links.try_push(LocLink {
             id: link.id,
             nature: link.nature,
             submitter: link.submitter.clone(),
             acknowledged_by_owner: self.is_owner(origin),
             acknowledged_by_verified_issuer: false,
-        });
+        }).map_err(|_| Error::<T>::LocLinksTooMuchData)?;
+		Ok(())
     }
 
     pub fn has_items_unacknowledged_by_owner(&self) -> bool {
@@ -397,6 +401,7 @@ pub type LegalOfficerCaseOf<T> = LegalOfficerCase<
     BalanceOf<T>,
 	<T as pallet::Config>::MaxLocMetadata,
 	<T as pallet::Config>::MaxLocFiles,
+	<T as pallet::Config>::MaxLocLinks,
 >;
 
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
@@ -549,6 +554,9 @@ pub mod pallet {
 
         /// The maximum number of files per LOC
         type MaxLocFiles: Get<u32> + TypeInfo;
+
+        /// The maximum number of links per LOC
+        type MaxLocLinks: Get<u32> + TypeInfo;
 
         /// The maximum number of files per token record
         type MaxTokensRecordFiles: Get<u32>;
@@ -855,6 +863,8 @@ pub mod pallet {
 		LocMetadataTooMuchData,
 		/// There are too much files in the LOC
 		LocFilesTooMuchData,
+		/// There are too much links in the LOC
+		LocLinksTooMuchData,
     }
 
     #[pallet::hooks]
@@ -1207,10 +1217,10 @@ pub mod pallet {
                     Err(Error::<T>::LinkedLocNotFound)?
                 } else {
                     loc.ensure_can_add_links::<T>(&Vec::from([link.clone()]))?;
-                    <LocMap<T>>::mutate(loc_id, |loc| {
+                    <LocMap<T>>::try_mutate(loc_id, |loc| {
                         let mutable_loc = loc.as_mut().unwrap();
-                        mutable_loc.add_link(&who, &link);
-                    });
+                        mutable_loc.add_link::<T>(&who, &link)
+                    })?;
                     Ok(().into())
                 }
             }
@@ -1955,7 +1965,7 @@ pub mod pallet {
                 files: BoundedVec::new(),
                 closed: false,
                 loc_type: loc_type.clone(),
-                links: Vec::new(),
+                links: BoundedVec::new(),
                 void_info: None,
                 replacer_of: None,
                 collection_last_block_submission: None,
@@ -1988,7 +1998,7 @@ pub mod pallet {
                 files: BoundedVec::new(),
                 closed: false,
                 loc_type: LocType::Collection,
-                links: Vec::new(),
+                links: BoundedVec::new(),
                 void_info: None,
                 replacer_of: None,
                 collection_last_block_submission: collection_last_block_submission.clone(),
