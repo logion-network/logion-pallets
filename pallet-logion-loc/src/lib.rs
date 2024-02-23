@@ -16,7 +16,7 @@ mod tests;
 
 mod benchmarking;
 
-use codec::{Decode, Encode};
+use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::{
     BoundedVec,
     sp_runtime::Saturating,
@@ -26,6 +26,7 @@ use scale_info::TypeInfo;
 use logion_shared::LegalOfficerCaseSummary;
 use crate::Requester::Account;
 use frame_system::pallet_prelude::BlockNumberFor;
+use sp_core::Get;
 #[cfg(feature = "runtime-benchmarks")]
 use sp_core::H160;
 use sp_std::{
@@ -42,7 +43,7 @@ use benchmarking::{
 	SponsorshipIdFactory,
 };
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen, Copy)]
 pub enum LocType {
     Transaction,
     Identity,
@@ -55,7 +56,7 @@ impl Default for LocType {
     }
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct MetadataItem<AccountId, EthereumAddress, Hash> {
     name: Hash,
     value: Hash,
@@ -64,7 +65,7 @@ pub struct MetadataItem<AccountId, EthereumAddress, Hash> {
     acknowledged_by_verified_issuer: bool,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct MetadataItemParams<AccountId, EthereumAddress, Hash> {
     name: Hash,
     value: Hash,
@@ -77,7 +78,7 @@ pub type MetadataItemParamsOf<T> = MetadataItemParams<
 	<T as pallet::Config>::Hash,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct LocLink<LocId, Hash, AccountId, EthereumAddress> {
     id: LocId,
     nature: Hash,
@@ -86,7 +87,7 @@ pub struct LocLink<LocId, Hash, AccountId, EthereumAddress> {
     acknowledged_by_verified_issuer: bool,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct LocLinkParams<LocId, Hash, AccountId, EthereumAddress> {
     id: LocId,
     nature: Hash,
@@ -100,7 +101,7 @@ pub type LocLinkParamsOf<T> = LocLinkParams<
 	<T as pallet::Config>::EthereumAddress,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct File<Hash, AccountId, EthereumAddress> {
     hash: Hash,
     nature: Hash,
@@ -110,7 +111,7 @@ pub struct File<Hash, AccountId, EthereumAddress> {
     acknowledged_by_verified_issuer: bool,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct FileParams<Hash, AccountId, EthereumAddress> {
     hash: Hash,
     nature: Hash,
@@ -124,7 +125,7 @@ pub type FileParamsOf<T> = FileParams<
 	<T as pallet::Config>::EthereumAddress,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct ItemsParams<LocId, AccountId, EthereumAddress, Hash> {
     metadata: Vec<MetadataItemParams<AccountId, EthereumAddress, Hash>>,
     files: Vec<FileParams<Hash, AccountId, EthereumAddress>>,
@@ -173,17 +174,17 @@ pub type ItemsParamsOf<T> = ItemsParams<
     <T as pallet::Config>::Hash,
 >;
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct LocVoidInfo<LocId> {
     replacer: Option<LocId>,
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen, Copy)]
 pub enum OtherAccountId<EthereumAddress> {
     Ethereum(EthereumAddress)
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub enum Requester<AccountId, LocId, EthereumAddress> {
     None,
     Account(AccountId),
@@ -200,7 +201,7 @@ impl<AccountId, LocId, EthereumAddress> Default for Requester<AccountId, LocId, 
     }
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen, Copy)]
 pub enum SupportedAccountId<AccountId, EthereumAddress> {
     None, // Enables "null" account ID
     Polkadot(AccountId),
@@ -216,15 +217,16 @@ impl<AccountId, EthereumAddress> Default for SupportedAccountId<AccountId, Ether
 
 pub type CollectionSize = u32;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
-pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance> {
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
+pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance,
+	MaxLocMetadata: Get<u32>, MaxLocFiles: Get<u32>, MaxLocLinks: Get<u32>> {
     owner: AccountId,
     requester: Requester<AccountId, LocId, EthereumAddress>,
-    metadata: Vec<MetadataItem<AccountId, EthereumAddress, Hash>>,
-    files: Vec<File<Hash, AccountId, EthereumAddress>>,
+    metadata: BoundedVec<MetadataItem<AccountId, EthereumAddress, Hash>, MaxLocMetadata>,
+    files: BoundedVec<File<Hash, AccountId, EthereumAddress>, MaxLocFiles>,
     closed: bool,
     loc_type: LocType,
-    links: Vec<LocLink<LocId, Hash, AccountId, EthereumAddress>>,
+    links: BoundedVec<LocLink<LocId, Hash, AccountId, EthereumAddress>, MaxLocLinks>,
     void_info: Option<LocVoidInfo<LocId>>,
     replacer_of: Option<LocId>,
     collection_last_block_submission: Option<BlockNumber>,
@@ -238,13 +240,16 @@ pub struct LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress
     tokens_record_fee: Balance,
 }
 
-impl<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance>
-LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance>
+impl<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance, MaxLocMetadata, MaxLocFiles, MaxLocLinks>
+LegalOfficerCase<AccountId, Hash, LocId, BlockNumber, EthereumAddress, SponsorshipId, Balance, MaxLocMetadata, MaxLocFiles, MaxLocLinks>
 where
     AccountId: PartialEq + Clone,
     Hash: PartialEq + Copy + Ord,
     LocId: PartialEq + Copy + Ord,
     EthereumAddress: PartialEq + Clone,
+	MaxLocMetadata: Get<u32>,
+	MaxLocFiles: Get<u32>,
+	MaxLocLinks: Get<u32>,
 {
 
     pub fn ensure_can_add<T: pallet::Config>(&self, items: &ItemsParams<LocId, AccountId, EthereumAddress, Hash>) -> Result<(), sp_runtime::DispatchError> {
@@ -315,45 +320,55 @@ where
         Ok(())
     }
 
-    pub fn add_items(&mut self, origin: &AccountId, items: &ItemsParams<LocId, AccountId, EthereumAddress, Hash>) -> () {
-        items.metadata.iter().for_each(|item| self.add_metadata(origin, item));
-        items.files.iter().for_each(|item| self.add_file(origin, item));
-        items.links.iter().for_each(|item| self.add_link(origin, item));
+    pub fn add_items<T: pallet::Config>(&mut self, origin: &AccountId, items: &ItemsParams<LocId, AccountId, EthereumAddress, Hash>) -> Result<(), sp_runtime::DispatchError> {
+		for item in items.metadata.iter() {
+			self.add_metadata::<T>(origin, item)?;
+		}
+		for item in items.files.iter() {
+			self.add_file::<T>(origin, item)?;
+		}
+		for item in items.links.iter() {
+			self.add_link::<T>(origin, item)?;
+		}
+		Ok(())
     }
 
-    pub fn add_metadata(&mut self, origin: &AccountId, item: &MetadataItemParams<AccountId, EthereumAddress, Hash>) -> () {
-        self.metadata.push(MetadataItem {
+    pub fn add_metadata<T: pallet::Config>(&mut self, origin: &AccountId, item: &MetadataItemParams<AccountId, EthereumAddress, Hash>) -> Result<(), sp_runtime::DispatchError> {
+        self.metadata.try_push(MetadataItem {
             name: item.name,
             value: item.value,
             submitter: item.submitter.clone(),
             acknowledged_by_owner: self.is_owner(origin),
             acknowledged_by_verified_issuer: false,
-        });
+        }).map_err(|_| Error::<T>::LocMetadataTooMuchData)?;
+		Ok(())
     }
 
     pub fn is_owner(&self, origin: &AccountId) -> bool {
         self.owner == *origin
     }
 
-    pub fn add_file(&mut self, origin: &AccountId, file: &FileParams<Hash, AccountId, EthereumAddress>) -> () {
-        self.files.push(File {
+    pub fn add_file<T: pallet::Config>(&mut self, origin: &AccountId, file: &FileParams<Hash, AccountId, EthereumAddress>) -> Result<(), sp_runtime::DispatchError> {
+        self.files.try_push(File {
             hash: file.hash,
             nature: file.nature,
             submitter: file.submitter.clone(),
             size: file.size,
             acknowledged_by_owner: self.is_owner(origin),
             acknowledged_by_verified_issuer: false,
-        });
+		}).map_err(|_| Error::<T>::LocFilesTooMuchData)?;
+		Ok(())
     }
 
-    pub fn add_link(&mut self, origin: &AccountId, link: &LocLinkParams<LocId, Hash, AccountId, EthereumAddress>) -> () {
-        self.links.push(LocLink {
+    pub fn add_link<T: pallet::Config>(&mut self, origin: &AccountId, link: &LocLinkParams<LocId, Hash, AccountId, EthereumAddress>) -> Result<(), sp_runtime::DispatchError> {
+        self.links.try_push(LocLink {
             id: link.id,
             nature: link.nature,
             submitter: link.submitter.clone(),
             acknowledged_by_owner: self.is_owner(origin),
             acknowledged_by_verified_issuer: false,
-        });
+        }).map_err(|_| Error::<T>::LocLinksTooMuchData)?;
+		Ok(())
     }
 
     pub fn has_items_unacknowledged_by_owner(&self) -> bool {
@@ -384,31 +399,46 @@ pub type LegalOfficerCaseOf<T> = LegalOfficerCase<
     <T as pallet::Config>::EthereumAddress,
     <T as pallet::Config>::SponsorshipId,
     BalanceOf<T>,
+	<T as pallet::Config>::MaxLocMetadata,
+	<T as pallet::Config>::MaxLocFiles,
+	<T as pallet::Config>::MaxLocLinks,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct TermsAndConditionsElement<LocId, Hash> {
     tc_type: Hash,
     tc_loc: LocId,
     details: Hash,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
-pub struct CollectionItem<Hash, LocId, TokenIssuance> {
+pub type TermsAndConditionsElementOf<T> = TermsAndConditionsElement<
+	<T as pallet::Config>::LocId,
+	<T as pallet::Config>::Hash,
+>;
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
+pub struct CollectionItem<Hash, TokenIssuance, BoundedCollectionItemFilesList, BoundedCollectionItemTCList> {
     description: Hash,
-    files: Vec<CollectionItemFile<Hash>>,
+    files: BoundedCollectionItemFilesList,
     token: Option<CollectionItemToken<TokenIssuance, Hash>>,
     restricted_delivery: bool,
-    terms_and_conditions: Vec<TermsAndConditionsElement<LocId, Hash>>,
+    terms_and_conditions: BoundedCollectionItemTCList,
 }
 
 pub type CollectionItemOf<T> = CollectionItem<
     <T as pallet::Config>::Hash,
-    <T as pallet::Config>::LocId,
     <T as pallet::Config>::TokenIssuance,
+	BoundedVec<
+		CollectionItemFileOf<T>,
+		<T as pallet::Config>::MaxCollectionItemFiles
+	>,
+	BoundedVec<
+		TermsAndConditionsElementOf<T>,
+		<T as pallet::Config>::MaxCollectionItemTCs
+	>,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct CollectionItemFile<Hash> {
     name: Hash,
     content_type: Hash,
@@ -418,14 +448,14 @@ pub struct CollectionItemFile<Hash> {
 
 pub type CollectionItemFileOf<T> = CollectionItemFile<<T as pallet::Config>::Hash>;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct CollectionItemToken<TokenIssuance, Hash> {
     token_type: Hash,
     token_id: Hash,
     token_issuance: TokenIssuance,
 }
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct VerifiedIssuer<LocId> {
     identity_loc: LocId,
 }
@@ -434,7 +464,7 @@ pub type VerifiedIssuerOf<T> = VerifiedIssuer<
     <T as pallet::Config>::LocId,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct TokensRecord<Hash, BoundedTokensRecordFilesList, AccountId> {
     description: Hash,
     files: BoundedTokensRecordFilesList,
@@ -450,7 +480,7 @@ pub type TokensRecordOf<T> = TokensRecord<
     <T as frame_system::Config>::AccountId,
 >;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct TokensRecordFile<Hash> {
     name: Hash,
     content_type: Hash,
@@ -466,7 +496,7 @@ pub type BalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system:
 
 pub type NegativeImbalanceOf<T> = <<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId, >>::NegativeImbalance;
 
-#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct Sponsorship<AccountId, EthereumAddress, LocId> {
     sponsor: AccountId,
     sponsored_account: SupportedAccountId<AccountId, EthereumAddress>,
@@ -489,7 +519,7 @@ pub trait Hasher<Hash> {
 
 #[frame_support::pallet]
 pub mod pallet {
-    use sp_std::collections::btree_set::BTreeSet;
+	use sp_std::collections::btree_set::BTreeSet;
     use frame_system::pallet_prelude::*;
     use frame_support::{
         dispatch::DispatchResultWithPostInfo,
@@ -508,10 +538,10 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// LOC identifier
-        type LocId: Member + Parameter + Default + Copy + HasCompact + Ord;
+        type LocId: Member + Parameter + Default + Copy + HasCompact + Ord + MaxEncodedLen;
 
         /// Type for hashes stored in LOCs
-        type Hash: Member + Parameter + Default + Copy + Ord;
+        type Hash: Member + Parameter + Default + Copy + Ord + MaxEncodedLen;
 
         /// Type for hasher
         type Hasher: Hasher<<Self as pallet::Config>::Hash>;
@@ -523,31 +553,31 @@ pub mod pallet {
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Collection item identifier
-        type CollectionItemId: Member + Parameter + Default + Copy;
-
-        /// The maximum size of a Collection Item description
-        type MaxCollectionItemDescriptionSize: Get<usize>;
-
-        /// The maximum size of a Collection Item Token Type
-        type MaxCollectionItemTokenTypeSize: Get<usize>;
-
-        /// The maximum size of a Collection Item Token ID
-        type MaxCollectionItemTokenIdSize: Get<usize>;
+        type CollectionItemId: Member + Parameter + Default + Copy + MaxEncodedLen;
 
         /// Query for checking that a signer is a legal officer
         type IsLegalOfficer: IsLegalOfficer<Self::AccountId, Self::RuntimeOrigin>;
 
         /// Token Record identifier
-        type TokensRecordId: Member + Parameter + Default + Copy;
+        type TokensRecordId: Member + Parameter + Default + Copy + MaxEncodedLen;
 
-        /// The maximum size of a Token Record description
-        type MaxTokensRecordDescriptionSize: Get<u32>;
+		/// The maximum number of LOCs per account
+		type MaxAccountLocs: Get<u32>;
 
-        /// The maximum size of a file name
-        type MaxFileNameSize: Get<u32>;
+        /// The maximum number of metadata items per LOC
+        type MaxLocMetadata: Get<u32> + TypeInfo;
 
-        /// The maximum size of a file's content type
-        type MaxFileContentTypeSize: Get<u32>;
+        /// The maximum number of files per LOC
+        type MaxLocFiles: Get<u32> + TypeInfo;
+
+        /// The maximum number of links per LOC
+        type MaxLocLinks: Get<u32> + TypeInfo;
+
+        /// The maximum number of files per collection item
+        type MaxCollectionItemFiles: Get<u32>;
+
+        /// The maximum number of files per collection item
+        type MaxCollectionItemTCs: Get<u32>;
 
         /// The maximum number of files per token record
         type MaxTokensRecordFiles: Get<u32>;
@@ -568,10 +598,10 @@ pub mod pallet {
         type FileStorageFeeDistributionKey: Get<DistributionKey>;
 
         /// Ethereum Address type
-        type EthereumAddress: Member + Parameter + Default + Copy;
+        type EthereumAddress: Member + Parameter + Default + Copy + MaxEncodedLen;
 
         /// The identifier of a sponsorship
-        type SponsorshipId: Member + Parameter + Default + Copy + HasCompact;
+        type SponsorshipId: Member + Parameter + Default + Copy + HasCompact + MaxEncodedLen;
 
         /// The certificate fee per issued token
         type CertificateFee: Get<BalanceOf<Self>>;
@@ -622,7 +652,6 @@ pub mod pallet {
     }
 
     #[pallet::pallet]
-    #[pallet::without_storage_info]
     pub struct Pallet<T>(_);
 
     /// All LOCs indexed by ID.
@@ -633,17 +662,17 @@ pub mod pallet {
     /// Requested LOCs by account ID.
     #[pallet::storage]
     #[pallet::getter(fn account_locs)]
-    pub type AccountLocsMap<T> = StorageMap<_, Blake2_128Concat, <T as frame_system::Config>::AccountId, Vec<<T as Config>::LocId>>;
+    pub type AccountLocsMap<T> = StorageMap<_, Blake2_128Concat, <T as frame_system::Config>::AccountId, BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs>>;
 
     /// Requested LOCs by logion Identity LOC.
     #[pallet::storage]
     #[pallet::getter(fn identity_loc_locs)]
-    pub type IdentityLocLocsMap<T> = StorageMap<_, Blake2_128Concat, <T as Config>::LocId, Vec<<T as Config>::LocId>>;
+    pub type IdentityLocLocsMap<T> = StorageMap<_, Blake2_128Concat, <T as Config>::LocId, BoundedVec<<T as crate::pallet::Config>::LocId, <T as Config>::MaxAccountLocs>>;
 
     /// Requested LOCs by other requester.
     #[pallet::storage]
     #[pallet::getter(fn other_account_locs)]
-    pub type OtherAccountLocsMap<T> = StorageMap<_, Blake2_128Concat, OtherAccountId<<T as Config>::EthereumAddress>, Vec<<T as Config>::LocId>>;
+    pub type OtherAccountLocsMap<T> = StorageMap<_, Blake2_128Concat, OtherAccountId<<T as Config>::EthereumAddress>, BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs>>;
 
     /// Collection items by LOC ID.
     #[pallet::storage]
@@ -850,6 +879,18 @@ pub mod pallet {
         CannotCloseUnacknowledgedByVerifiedIssuer,
 		/// The provided Polkadot account has no closed, non-void identity LOC
 		AccountNotIdentified,
+		/// There are too much metadata in the LOC
+		LocMetadataTooMuchData,
+		/// There are too much files in the LOC
+		LocFilesTooMuchData,
+		/// There are too much links in the LOC
+		LocLinksTooMuchData,
+		/// There are too much files in the Collection Item
+		CollectionItemFilesTooMuchData,
+		/// There are too much terms and conditions in the Collection Item
+		CollectionItemTCsTooMuchData,
+		/// There are too much LOCs linked to account
+		AccountLocsTooMuchData,
     }
 
     #[pallet::hooks]
@@ -870,7 +911,7 @@ pub mod pallet {
         }
     }
 
-    #[derive(Encode, Decode, Eq, PartialEq, Debug, TypeInfo)]
+    #[derive(Encode, Decode, Eq, PartialEq, Debug, TypeInfo, MaxEncodedLen)]
     pub enum StorageVersion {
         V1,
         V2MakeLocVoid,
@@ -894,11 +935,12 @@ pub mod pallet {
         V20AddCustomLegalFee,
         V21EnableRequesterLinks,
         V22AddRecurrentFees,
+        V23BoundedLocItems,
     }
 
     impl Default for StorageVersion {
         fn default() -> StorageVersion {
-            return StorageVersion::V22AddRecurrentFees;
+            return StorageVersion::V23BoundedLocItems;
         }
     }
 
@@ -935,11 +977,11 @@ pub mod pallet {
                     .map(|file| file.size)
                     .fold(0, |tot, current| tot + current);
                 Self::apply_file_storage_fee(&requester_account_id, items.files.len(), tot_size)?;
-                loc.add_items(&requester_account_id, &items);
+                loc.add_items::<T>(&requester_account_id, &items)?;
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
-                Self::link_with_account(&requester_account_id, &loc_id);
+                Self::link_with_account(&requester_account_id, &loc_id)?;
 
                 Self::deposit_event(Event::LocCreated(loc_id));
                 Ok(().into())
@@ -995,11 +1037,11 @@ pub mod pallet {
                     .map(|file| file.size)
                     .fold(0, |tot, current| tot + current);
                 Self::apply_file_storage_fee(&requester_account_id, items.files.len(), tot_size)?;
-                loc.add_items(&requester_account_id, &items);
+                loc.add_items::<T>(&requester_account_id, &items)?;
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
-                Self::link_with_account(&requester_account_id, &loc_id);
+                Self::link_with_account(&requester_account_id, &loc_id)?;
 
                 Self::deposit_event(Event::LocCreated(loc_id));
                 Ok(().into())
@@ -1030,7 +1072,7 @@ pub mod pallet {
                             let requester = RequesterOf::<T>::Loc(requester_loc_id.clone());
                             let new_loc = Self::build_open_loc(&who, &requester, LocType::Transaction, None, BalanceOf::<T>::zero());
                             <LocMap<T>>::insert(loc_id, new_loc);
-                            Self::link_with_identity_loc(&requester_loc_id, &loc_id);
+                            Self::link_with_identity_loc(&requester_loc_id, &loc_id)?;
                         },
                 }
 
@@ -1086,7 +1128,7 @@ pub mod pallet {
                     .map(|file| file.size)
                     .fold(0, |tot, current| tot + current);
                 Self::apply_file_storage_fee(&requester_account_id, items.files.len(), tot_size)?;
-                loc.add_items(&requester_account_id, &items);
+                loc.add_items::<T>(&requester_account_id, &items)?;
 
                 Self::apply_legal_fee(&loc)?;
                 if value_fee > 0_u32.into() {
@@ -1094,7 +1136,7 @@ pub mod pallet {
                     T::Currency::reserve(&requester_account_id, value_fee)?
                 }
                 <LocMap<T>>::insert(loc_id, loc);
-                Self::link_with_account(&requester_account_id, &loc_id);
+                Self::link_with_account(&requester_account_id, &loc_id)?;
 
                 Self::deposit_event(Event::LocCreated(loc_id));
                 Ok(().into())
@@ -1124,10 +1166,10 @@ pub mod pallet {
                     Err(Error::<T>::CannotMutateVoid)?
                 } else {
                     loc.ensure_can_add_metadata::<T>(&Vec::from([item.clone()]))?;
-                    <LocMap<T>>::mutate(loc_id, |loc| {
+                    <LocMap<T>>::try_mutate(loc_id, |loc| {
                         let mutable_loc = loc.as_mut().unwrap();
-                        mutable_loc.add_metadata(&who, &item);
-                    });
+                        mutable_loc.add_metadata::<T>(&who, &item)
+                    })?;
                     Ok(().into())
                 }
             }
@@ -1167,10 +1209,10 @@ pub mod pallet {
                         };
                     }
                     Self::apply_file_storage_fee(&fee_payer, 1, file.size)?;
-                    <LocMap<T>>::mutate(loc_id, |loc| {
+                    <LocMap<T>>::try_mutate(loc_id, |loc| {
                         let mutable_loc = loc.as_mut().unwrap();
-                        mutable_loc.add_file(&who, &file);
-                    });
+                        mutable_loc.add_file::<T>(&who, &file)
+                    })?;
                     Ok(().into())
                 }
             }
@@ -1201,10 +1243,10 @@ pub mod pallet {
                     Err(Error::<T>::LinkedLocNotFound)?
                 } else {
                     loc.ensure_can_add_links::<T>(&Vec::from([link.clone()]))?;
-                    <LocMap<T>>::mutate(loc_id, |loc| {
+                    <LocMap<T>>::try_mutate(loc_id, |loc| {
                         let mutable_loc = loc.as_mut().unwrap();
-                        mutable_loc.add_link(&who, &link);
-                    });
+                        mutable_loc.add_link::<T>(&who, &link)
+                    })?;
                     Ok(().into())
                 }
             }
@@ -1425,7 +1467,7 @@ pub mod pallet {
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
-                Self::link_with_other_account(&requester_account_id, &loc_id);
+                Self::link_with_other_account(&requester_account_id, &loc_id)?;
                 Self::link_sponsorship_to_loc(&sponsorship_id, &loc_id);
 
                 Self::deposit_event(Event::LocCreated(loc_id));
@@ -1889,42 +1931,57 @@ pub mod pallet {
         fn link_with_account(
             account_id: &<T as frame_system::Config>::AccountId,
             loc_id: &<T as Config>::LocId,
-        ) {
+        ) -> Result<(), sp_runtime::DispatchError> {
             if <AccountLocsMap<T>>::contains_key(account_id) {
                 <AccountLocsMap<T>>::mutate(account_id, |locs| {
                     let list = locs.as_mut().unwrap();
-                    list.push(loc_id.clone());
-                });
+                    list.try_push(loc_id.clone())
+                }).map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
+				Ok(())
             } else {
-                <AccountLocsMap<T>>::insert(account_id, Vec::from([loc_id.clone()]));
+				let mut list: BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs> = BoundedVec::new();
+				list.try_push(loc_id.clone())
+					.map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
+				<AccountLocsMap<T>>::insert(account_id, list);
+				Ok(())
             }
         }
 
         fn link_with_identity_loc(
             requester_loc_id: &<T as Config>::LocId,
             loc_id: &<T as Config>::LocId,
-        ) {
+        ) -> Result<(), sp_runtime::DispatchError> {
             if <IdentityLocLocsMap<T>>::contains_key(requester_loc_id) {
                 <IdentityLocLocsMap<T>>::mutate(requester_loc_id, |locs| {
                     let list = locs.as_mut().unwrap();
-                    list.push(loc_id.clone());
-                });
+					list.try_push(loc_id.clone())
+                }).map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
+				Ok(())
             } else {
-                <IdentityLocLocsMap<T>>::insert(requester_loc_id, Vec::from([loc_id.clone()]));
+				let mut list: BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs> = BoundedVec::new();
+				list.try_push(loc_id.clone())
+					.map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
+                <IdentityLocLocsMap<T>>::insert(requester_loc_id, list);
+				Ok(())
             }
         }
 
         fn link_with_other_account(
             account_id: &OtherAccountId<T::EthereumAddress>,
             loc_id: &<T as Config>::LocId,
-        ) {
+        ) -> Result<(), sp_runtime::DispatchError> {
             if <OtherAccountLocsMap<T>>::contains_key(account_id) {
                 <OtherAccountLocsMap<T>>::mutate(account_id, |locs| {
                     let list = locs.as_mut().unwrap();
-                    list.push(loc_id.clone());
-                });
+					list.try_push(loc_id.clone())
+                }).map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
+				Ok(())
             } else {
-                <OtherAccountLocsMap<T>>::insert(account_id, Vec::from([loc_id.clone()]));
+				let mut list: BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs> = BoundedVec::new();
+				list.try_push(loc_id.clone())
+					.map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
+                <OtherAccountLocsMap<T>>::insert(account_id, list);
+				Ok(())
             }
         }
 
@@ -1945,11 +2002,11 @@ pub mod pallet {
             LegalOfficerCaseOf::<T> {
                 owner: legal_officer.clone(),
                 requester: requester.clone(),
-                metadata: Vec::new(),
-                files: Vec::new(),
+                metadata: BoundedVec::new(),
+                files: BoundedVec::new(),
                 closed: false,
                 loc_type: loc_type.clone(),
-                links: Vec::new(),
+                links: BoundedVec::new(),
                 void_info: None,
                 replacer_of: None,
                 collection_last_block_submission: None,
@@ -1978,11 +2035,11 @@ pub mod pallet {
             LegalOfficerCaseOf::<T> {
                 owner: who.clone(),
                 requester: requester.clone(),
-                metadata: Vec::new(),
-                files: Vec::new(),
+                metadata: BoundedVec::new(),
+                files: BoundedVec::new(),
                 closed: false,
                 loc_type: LocType::Collection,
-                links: Vec::new(),
+                links: BoundedVec::new(),
                 void_info: None,
                 replacer_of: None,
                 collection_last_block_submission: collection_last_block_submission.clone(),
@@ -2085,12 +2142,16 @@ pub mod pallet {
                         .map(|file| file.size)
                         .fold(0, |tot, current| tot + current);
                     Self::apply_file_storage_fee(&who, item_files.len(), tot_size)?;
-                    let item = CollectionItem {
+					let bounded_files: BoundedVec<CollectionItemFileOf<T>, T::MaxCollectionItemFiles> = BoundedVec::try_from(item_files)
+						.map_err(|_| Error::<T>::CollectionItemFilesTooMuchData)?;
+					let bounded_tcs: BoundedVec<TermsAndConditionsElementOf<T>, T::MaxCollectionItemTCs> = BoundedVec::try_from(terms_and_conditions)
+						.map_err(|_| Error::<T>::CollectionItemTCsTooMuchData)?;
+					let item = CollectionItem {
                         description: item_description,
-                        files: item_files,
+                        files: bounded_files,
                         token: item_token.clone(),
                         restricted_delivery,
-                        terms_and_conditions,
+                        terms_and_conditions: bounded_tcs,
                     };
                     <CollectionItemsMap<T>>::insert(collection_loc_id, item_id, item);
                     let collection_size = <CollectionSizeMap<T>>::get(&collection_loc_id).unwrap_or(0);

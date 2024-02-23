@@ -4,18 +4,13 @@ use frame_support::dispatch::DispatchResultWithPostInfo;
 use frame_support::traits::Len;
 use frame_system::pallet_prelude::{BlockNumberFor, OriginFor};
 use sp_core::{H160, H256};
+use sp_core::bounded::BoundedVec;
 use sp_runtime::traits::BlakeTwo256;
 use sp_runtime::traits::Hash;
 
 use logion_shared::{Beneficiary, LocQuery, LocValidity};
 
-use crate::{
-	CollectionItem, CollectionItemFile, CollectionItemToken, Config, Error, fees::*, File,
-	FileParams, Hasher, ItemsParams, ItemsParamsOf,
-	LegalOfficerCase, LocLink, LocLinkParams, LocType, MetadataItem, MetadataItemParams,
-	mock::*, OtherAccountId, Requester::{Account, OtherAccount}, SupportedAccountId, TermsAndConditionsElement,
-	TokensRecordFile, TokensRecordFileOf, VerifiedIssuer,
-};
+use crate::{CollectionItem, CollectionItemFile, CollectionItemToken, Config, Error, fees::*, File, FileParams, Hasher, ItemsParams, ItemsParamsOf, LegalOfficerCase, LocLink, LocLinkParams, LocType, MetadataItem, MetadataItemParams, mock::*, OtherAccountId, Requester::{Account, OtherAccount}, SupportedAccountId, TermsAndConditionsElement, TermsAndConditionsElementOf, TokensRecordFile, TokensRecordFileOf, VerifiedIssuer};
 
 const LOC_ID: u32 = 0;
 const OTHER_LOC_ID: u32 = 1;
@@ -46,11 +41,11 @@ fn it_creates_loc_with_default_legal_fee() {
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: legal_officer_id(1),
             requester: LOC_REQUESTER,
-            metadata: vec![],
-            files: vec![],
+            metadata: BoundedVec::new(),
+            files: BoundedVec::new(),
             closed: false,
             loc_type: LocType::Transaction,
-            links: vec![],
+            links: BoundedVec::new(),
             void_info: None,
             replacer_of: None,
             collection_last_block_submission: None,
@@ -94,11 +89,11 @@ fn it_creates_loc_with_custom_legal_fee() {
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: legal_officer_id(1),
             requester: LOC_REQUESTER,
-            metadata: vec![],
-            files: vec![],
+            metadata: BoundedVec::new(),
+            files: BoundedVec::new(),
             closed: false,
             loc_type: LocType::Transaction,
-            links: vec![],
+            links: BoundedVec::new(),
             void_info: None,
             replacer_of: None,
             collection_last_block_submission: None,
@@ -993,6 +988,7 @@ fn add_metadata(name: u8, submitter: u64) -> MetadataItemParams<AccountId, Ether
     assert_ok!(LogionLoc::add_metadata(RuntimeOrigin::signed(submitter), LOC_ID, metadata.clone()));
     metadata
 }
+
 fn add_file(content: &str, submitter: u64) -> FileParams<H256, AccountId, EthereumAddress> {
     let file = FileParams {
         hash: sha256(&content.as_bytes().to_vec()),
@@ -1205,11 +1201,11 @@ fn it_creates_collection_loc() {
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: legal_officer_id(1),
             requester: LOC_REQUESTER,
-            metadata: vec![],
-            files: vec![],
+            metadata: BoundedVec::new(),
+            files: BoundedVec::new(),
             closed: false,
             loc_type: LocType::Collection,
-            links: vec![],
+            links: BoundedVec::new(),
             void_info: None,
             replacer_of: None,
             collection_last_block_submission: None,
@@ -1267,10 +1263,10 @@ fn it_adds_item_to_closed_collection_loc() {
         assert_ok!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], None, false, Vec::new()));
         assert_eq!(LogionLoc::collection_items(LOC_ID, collection_item_id), Some(CollectionItem {
             description: collection_item_description,
-            files: vec![],
+            files: BoundedVec::new(),
             token: None,
             restricted_delivery: false,
-            terms_and_conditions: vec![],
+            terms_and_conditions: BoundedVec::new(),
         }));
         assert_eq!(LogionLoc::collection_size(LOC_ID), Some(1));
     });
@@ -1339,37 +1335,62 @@ fn it_fails_to_item_with_terms_and_conditions_when_void_tc_loc() {
 #[test]
 fn it_adds_item_with_terms_and_conditions_to_closed_collection_loc() {
     new_test_ext().execute_with(|| {
-        setup_default_balances();
-        assert_ok!(create_identity_and_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, legal_officer_id(1), None, Some(10), false, 0, OTHER_LOC_DEFAULT_LEGAL_FEE, 0, 0, ItemsParams::empty()));
-        assert_ok!(LogionLoc::close(RuntimeOrigin::signed(legal_officer_id(1)), LOC_ID, None, false));
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOGION_CLASSIFICATION_LOC_ID, legal_officer_id(1), OTHER_LOC_DEFAULT_LEGAL_FEE, ItemsParams::empty()));
-        assert_ok!(LogionLoc::close(RuntimeOrigin::signed(legal_officer_id(1)), LOGION_CLASSIFICATION_LOC_ID, None, false));
-        assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), ADDITIONAL_TC_LOC_ID, legal_officer_id(1), OTHER_LOC_DEFAULT_LEGAL_FEE, ItemsParams::empty()));
-        assert_ok!(LogionLoc::close(RuntimeOrigin::signed(legal_officer_id(1)), ADDITIONAL_TC_LOC_ID, None, false));
-
+		setup_terms_and_conditions_locs();
+		let tcs = create_terms_and_conditions();
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
         let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
-        let tc1 = TermsAndConditionsElement {
-            tc_type: sha256(&"Logion".as_bytes().to_vec()),
-            tc_loc: LOGION_CLASSIFICATION_LOC_ID,
-            details: sha256(&"ITEM-A, ITEM-B".as_bytes().to_vec()),
-        };
-        let tc2 = TermsAndConditionsElement {
-            tc_type: sha256(&"Specific".as_bytes().to_vec()),
-            tc_loc: ADDITIONAL_TC_LOC_ID,
-            details: sha256(&"Some more details".as_bytes().to_vec()),
-        };
-        let terms_and_conditions = vec![tc1, tc2];
+        let terms_and_conditions = vec![tcs[0].clone(), tcs[1].clone()];
         assert_ok!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], None, false, terms_and_conditions.clone()));
         assert_eq!(LogionLoc::collection_items(LOC_ID, collection_item_id), Some(CollectionItem {
             description: collection_item_description,
-            files: vec![],
+            files: BoundedVec::new(),
             token: None,
             restricted_delivery: false,
-            terms_and_conditions: terms_and_conditions.clone(),
+            terms_and_conditions: BoundedVec::try_from(terms_and_conditions.clone()).expect("Failed to convert to BoundedVec"),
         }));
         assert_eq!(LogionLoc::collection_size(LOC_ID), Some(1));
     });
+}
+
+#[test]
+fn it_fails_to_add_item_with_too_much_terms_and_conditions() {
+    new_test_ext().execute_with(|| {
+		setup_terms_and_conditions_locs();
+		let tcs = create_terms_and_conditions();
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        let terms_and_conditions = vec![tcs[0].clone(), tcs[1].clone(), tcs[2].clone()];
+        assert_err!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description.clone(), vec![], None, false, terms_and_conditions.clone()), Error::<Test>::CollectionItemTCsTooMuchData);
+    });
+}
+
+fn setup_terms_and_conditions_locs() {
+	setup_default_balances();
+	assert_ok!(create_identity_and_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, legal_officer_id(1), None, Some(10), false, 0, OTHER_LOC_DEFAULT_LEGAL_FEE, 0, 0, ItemsParams::empty()));
+	assert_ok!(LogionLoc::close(RuntimeOrigin::signed(legal_officer_id(1)), LOC_ID, None, false));
+	assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOGION_CLASSIFICATION_LOC_ID, legal_officer_id(1), OTHER_LOC_DEFAULT_LEGAL_FEE, ItemsParams::empty()));
+	assert_ok!(LogionLoc::close(RuntimeOrigin::signed(legal_officer_id(1)), LOGION_CLASSIFICATION_LOC_ID, None, false));
+	assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), ADDITIONAL_TC_LOC_ID, legal_officer_id(1), OTHER_LOC_DEFAULT_LEGAL_FEE, ItemsParams::empty()));
+	assert_ok!(LogionLoc::close(RuntimeOrigin::signed(legal_officer_id(1)), ADDITIONAL_TC_LOC_ID, None, false));
+}
+
+fn create_terms_and_conditions() -> [TermsAndConditionsElementOf<Test>; 3] {
+	let tc1 = TermsAndConditionsElement {
+		tc_type: sha256(&"Logion".as_bytes().to_vec()),
+		tc_loc: LOGION_CLASSIFICATION_LOC_ID,
+		details: sha256(&"ITEM-A, ITEM-B".as_bytes().to_vec()),
+	};
+	let tc2 = TermsAndConditionsElement {
+		tc_type: sha256(&"Specific".as_bytes().to_vec()),
+		tc_loc: ADDITIONAL_TC_LOC_ID,
+		details: sha256(&"Some more details".as_bytes().to_vec()),
+	};
+	let tc3 = TermsAndConditionsElement {
+		tc_type: sha256(&"Specific".as_bytes().to_vec()),
+		tc_loc: ADDITIONAL_TC_LOC_ID,
+		details: sha256(&"Even more details".as_bytes().to_vec()),
+	};
+	[tc1, tc2, tc3]
 }
 
 #[test]
@@ -1599,26 +1620,55 @@ fn it_adds_item_with_two_files_attached() {
 
         let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
         let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
-        let collection_item_files = vec![
-            CollectionItemFile {
-                name: sha256(&"picture.png".as_bytes().to_vec()),
-                content_type: sha256(&"image/png".as_bytes().to_vec()),
-                hash: BlakeTwo256::hash_of(&"file content".as_bytes().to_vec()),
-                size: 123456,
-            },
-            CollectionItemFile {
-                name: sha256(&"doc.pdf".as_bytes().to_vec()),
-                content_type: sha256(&"application/pdf".as_bytes().to_vec()),
-                hash: BlakeTwo256::hash_of(&"some other content".as_bytes().to_vec()),
-                size: 789,
-            },
-        ];
+		let files = create_files();
+        let collection_item_files = vec![files[0].clone(), files[1].clone()];
         let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, legal_officers());
         assert_ok!(LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description, collection_item_files, None, false, Vec::new()));
 
         let fees = Fees::only_storage(2, 123456 + 789);
         fees.assert_balances_events(snapshot);
     });
+}
+
+#[test]
+fn it_fails_to_add_item_with_too_much_files_attached() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        assert_ok!(create_identity_and_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, legal_officer_id(1), None, Some(1), true, 0, OTHER_LOC_DEFAULT_LEGAL_FEE, 0, 0, ItemsParams::empty()));
+        assert_ok!(LogionLoc::close(RuntimeOrigin::signed(legal_officer_id(1)), LOC_ID, None, false));
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+		let files = create_files();
+        let collection_item_files = vec![files[0].clone(), files[1].clone(), files[2].clone()];
+        assert_err!(
+			LogionLoc::add_collection_item(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, collection_item_id, collection_item_description, collection_item_files, None, false, Vec::new()),
+			Error::<Test>::CollectionItemFilesTooMuchData
+		);
+    });
+}
+
+fn create_files() -> [CollectionItemFile<<Test as Config>::Hash>; 3] {
+	[
+		CollectionItemFile {
+			name: sha256(&"picture.png".as_bytes().to_vec()),
+			content_type: sha256(&"image/png".as_bytes().to_vec()),
+			hash: BlakeTwo256::hash_of(&"file content".as_bytes().to_vec()),
+			size: 123456,
+		},
+		CollectionItemFile {
+			name: sha256(&"doc.pdf".as_bytes().to_vec()),
+			content_type: sha256(&"application/pdf".as_bytes().to_vec()),
+			hash: BlakeTwo256::hash_of(&"some other content".as_bytes().to_vec()),
+			size: 789,
+		},
+		CollectionItemFile {
+			name: sha256(&"file.txt".as_bytes().to_vec()),
+			content_type: sha256(&"text/plain".as_bytes().to_vec()),
+			hash: BlakeTwo256::hash_of(&"some other, different content".as_bytes().to_vec()),
+			size: 29,
+		},
+	]
 }
 
 #[test]
@@ -1749,6 +1799,41 @@ fn it_adds_several_metadata() {
         let loc = LogionLoc::loc(LOC_ID).unwrap();
         assert_eq!(loc.metadata[0], expected_metadata(metadata1, ACKNOWLEDGED, NOT_ACKNOWLEDGED));
         assert_eq!(loc.metadata[1], expected_metadata(metadata2, ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_to_add_too_much_metadata() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        assert_ok!(create_identity_and_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, legal_officer_id(1), OTHER_LOC_DEFAULT_LEGAL_FEE, ItemsParams::empty()));
+		for i in 0..MAX_LOC_ITEMS {
+			let _ = add_metadata(i, LOC_REQUESTER_ID);
+		}
+        let metadata = MetadataItemParams {
+            name: sha256(&vec![1, 2, 3]),
+            value: sha256(&vec![4, 5, 6]),
+            submitter: SupportedAccountId::Polkadot(legal_officer_id(1)),
+        };
+		assert_err!(LogionLoc::add_metadata(RuntimeOrigin::signed(legal_officer_id(1)), LOC_ID, metadata.clone()), Error::<Test>::LocMetadataTooMuchData);
+    });
+}
+
+#[test]
+fn it_fails_to_add_too_much_files() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        assert_ok!(create_identity_and_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, legal_officer_id(1), OTHER_LOC_DEFAULT_LEGAL_FEE, ItemsParams::empty()));
+		for i in 0..MAX_LOC_ITEMS {
+			let _ = add_file(&i.to_string(), LOC_REQUESTER_ID);
+		}
+		let file = FileParams {
+			hash: sha256(&"abcde".as_bytes().to_vec()),
+			nature: sha256(&"test-file-nature".as_bytes().to_vec()),
+			submitter: SupportedAccountId::Polkadot(legal_officer_id(1)),
+			size: FILE_SIZE,
+		};
+		assert_err!(LogionLoc::add_file(RuntimeOrigin::signed(legal_officer_id(1)), LOC_ID, file.clone()), Error::<Test>::LocFilesTooMuchData);
     });
 }
 
@@ -2294,11 +2379,11 @@ fn it_creates_ethereum_identity_loc() {
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: legal_officer_id(1),
             requester: OtherAccount(requester_account_id.clone()),
-            metadata: vec![],
-            files: vec![],
+            metadata: BoundedVec::new(),
+            files: BoundedVec::new(),
             closed: false,
             loc_type: LocType::Identity,
-            links: vec![],
+            links: BoundedVec::new(),
             void_info: None,
             replacer_of: None,
             collection_last_block_submission: None,
@@ -2311,7 +2396,8 @@ fn it_creates_ethereum_identity_loc() {
             collection_item_fee: 0,
             tokens_record_fee: 0,
         }));
-        assert_eq!(LogionLoc::other_account_locs(requester_account_id), Some(vec![LOC_ID]));
+		let loc_ids = BoundedVec::try_from(vec![LOC_ID]).expect("Failed to create expected BoundedVec");
+        assert_eq!(LogionLoc::other_account_locs(requester_account_id), Some(loc_ids));
         assert_eq!(LogionLoc::sponsorship(sponsorship_id).unwrap().loc_id, Some(LOC_ID));
         System::assert_has_event(RuntimeEvent::LogionLoc(crate::Event::LocCreated { 0: LOC_ID }));
 
@@ -2329,11 +2415,11 @@ fn it_creates_polkadot_identity_loc() {
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: legal_officer_id(1),
             requester: Account(LOC_REQUESTER_ID),
-            metadata: vec![],
-            files: vec![],
+            metadata: BoundedVec::new(),
+            files: BoundedVec::new(),
             closed: false,
             loc_type: LocType::Identity,
-            links: vec![],
+            links: BoundedVec::new(),
             void_info: None,
             replacer_of: None,
             collection_last_block_submission: None,
@@ -2346,7 +2432,8 @@ fn it_creates_polkadot_identity_loc() {
             collection_item_fee: 0,
             tokens_record_fee: 0,
         }));
-        assert_eq!(LogionLoc::account_locs(LOC_REQUESTER_ID), Some(vec![LOC_ID]));
+		let loc_ids = BoundedVec::try_from(vec![LOC_ID]).expect("Failed to create expected BoundedVec");
+        assert_eq!(LogionLoc::account_locs(LOC_REQUESTER_ID), Some(loc_ids));
         System::assert_has_event(RuntimeEvent::LogionLoc(crate::Event::LocCreated { 0: LOC_ID }));
 
         let fees = Fees::only_legal(160 * ONE_LGNT, Beneficiary::Other);
@@ -2477,11 +2564,11 @@ fn it_reserves_value_fees() {
         assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
             owner: legal_officer_id(1),
             requester: LOC_REQUESTER,
-            metadata: vec![],
-            files: vec![],
+            metadata: BoundedVec::new(),
+            files: BoundedVec::new(),
             closed: false,
             loc_type: LocType::Collection,
-            links: vec![],
+            links: BoundedVec::new(),
             void_info: None,
             replacer_of: None,
             collection_last_block_submission: None,
@@ -2753,6 +2840,50 @@ fn it_creates_identity_loc_with_initial_metadata() {
         assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, legal_officer_id(1), ID_LOC_DEFAULT_LEGAL_FEE, ItemsParams::only_metadata(Vec::from([ metadata.clone() ]))));
         let loc = LogionLoc::loc(LOC_ID).unwrap();
         assert_eq!(loc.metadata[0], expected_metadata(metadata, NOT_ACKNOWLEDGED, NOT_ACKNOWLEDGED));
+    });
+}
+
+#[test]
+fn it_fails_to_create_too_much_identity_locs() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+		for i in 0u32..MaxAccountLocs::get() {
+			assert_ok!(LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), i, legal_officer_id(1), 0, ItemsParams::empty()));
+		}
+		assert_err!(
+			LogionLoc::create_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), MaxAccountLocs::get(), legal_officer_id(1), ID_LOC_DEFAULT_LEGAL_FEE, ItemsParams::empty()),
+			Error::<Test>::AccountLocsTooMuchData
+		);
+    });
+}
+
+#[test]
+fn it_fails_to_create_too_much_transaction_locs() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+		create_closed_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), 0);
+		for i in 1u32..MaxAccountLocs::get() {
+			assert_ok!(LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), i, legal_officer_id(1), 0, ItemsParams::empty()));
+		}
+		assert_err!(
+			LogionLoc::create_polkadot_transaction_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), MaxAccountLocs::get(), legal_officer_id(1), OTHER_LOC_DEFAULT_LEGAL_FEE, ItemsParams::empty()),
+			Error::<Test>::AccountLocsTooMuchData
+		);
+    });
+}
+
+#[test]
+fn it_fails_to_create_too_much_collection_locs() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+		create_closed_polkadot_identity_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), 0);
+		for i in 1u32..MaxAccountLocs::get() {
+			assert_ok!(LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), i, legal_officer_id(1), None, Some(10), false, 0, 0, 0, 0, ItemsParams::empty()));
+		}
+		assert_err!(
+			LogionLoc::create_collection_loc(RuntimeOrigin::signed(LOC_REQUESTER_ID), MaxAccountLocs::get(), legal_officer_id(1), None, Some(10), false, 0, 0, 0, 0, ItemsParams::empty()),
+			Error::<Test>::AccountLocsTooMuchData
+		);
     });
 }
 
