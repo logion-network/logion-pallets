@@ -1,4 +1,5 @@
 use frame_support::{assert_err, assert_ok};
+use sp_core::bounded::BoundedVec;
 use sp_runtime::DispatchError::BadOrigin;
 
 use crate::{Ballot, BallotStatus, Error, Event, Vote};
@@ -17,10 +18,10 @@ fn it_creates_vote() {
         assert_eq!(LogionVote::votes(1), Some(
             Vote {
                 loc_id: LOC_ID,
-                ballots: vec![
+                ballots: BoundedVec::try_from(vec![
                     Ballot { voter: legal_officer_id(1), status: BallotStatus::NotVoted },
                     Ballot { voter: legal_officer_id(2), status: BallotStatus::NotVoted },
-                ]
+				]).expect("Failed to create expected BoundedVec")
             }));
         assert_eq!(LogionVote::votes(2), None);
         assert_eq!(LogionVote::is_vote_closed_and_approved(vote_id), (false, false));
@@ -59,10 +60,10 @@ fn it_votes_yes() {
         assert_eq!(LogionVote::votes(vote_id), Some(
             Vote {
                 loc_id: LOC_ID,
-                ballots: vec![
+				ballots: BoundedVec::try_from(vec![
                     Ballot { voter: legal_officer_id(1), status: BallotStatus::VotedYes },
                     Ballot { voter: legal_officer_id(2), status: BallotStatus::NotVoted },
-                ]
+				]).expect("Failed to create expected BoundedVec")
             }));
         assert_eq!(LogionVote::is_vote_closed_and_approved(vote_id), (false, false));
         System::assert_has_event(Event::VoteUpdated(
@@ -85,10 +86,10 @@ fn it_votes_yes_and_no() {
         assert_eq!(LogionVote::votes(vote_id), Some(
             Vote {
                 loc_id: LOC_ID,
-                ballots: vec![
+				ballots: BoundedVec::try_from(vec![
                     Ballot { voter: legal_officer_id(1), status: BallotStatus::VotedYes },
                     Ballot { voter: legal_officer_id(2), status: BallotStatus::VotedNo },
-                ]
+				]).expect("Failed to create expected BoundedVec")
             }));
         assert_eq!(LogionVote::is_vote_closed_and_approved(vote_id), (true, false));
         System::assert_has_event(Event::VoteUpdated(
@@ -117,10 +118,10 @@ fn it_votes_yes_and_yes() {
         assert_eq!(LogionVote::votes(vote_id), Some(
             Vote {
                 loc_id: LOC_ID,
-                ballots: vec![
+                ballots: BoundedVec::try_from(vec![
                     Ballot { voter: legal_officer_id(1), status: BallotStatus::VotedYes },
                     Ballot { voter: legal_officer_id(2), status: BallotStatus::VotedYes },
-                ]
+                ]).expect("Failed to create expected BoundedVec")
             }));
         assert_eq!(LogionVote::is_vote_closed_and_approved(vote_id), (true, true));
         System::assert_has_event(Event::VoteUpdated(
