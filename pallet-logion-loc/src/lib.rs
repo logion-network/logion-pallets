@@ -664,15 +664,17 @@ pub mod pallet {
     #[pallet::getter(fn account_locs)]
     pub type AccountLocsMap<T> = StorageMap<_, Blake2_128Concat, <T as frame_system::Config>::AccountId, BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs>>;
 
+	// TO REMOVE
     /// Requested LOCs by logion Identity LOC.
-    #[pallet::storage]
-    #[pallet::getter(fn identity_loc_locs)]
-    pub type IdentityLocLocsMap<T> = StorageMap<_, Blake2_128Concat, <T as Config>::LocId, BoundedVec<<T as crate::pallet::Config>::LocId, <T as Config>::MaxAccountLocs>>;
+    // #[pallet::storage]
+    // #[pallet::getter(fn identity_loc_locs)]
+    // pub type IdentityLocLocsMap<T> = StorageMap<_, Blake2_128Concat, <T as Config>::LocId, BoundedVec<<T as crate::pallet::Config>::LocId, <T as Config>::MaxAccountLocs>>;
 
+	// TO REMOVE
     /// Requested LOCs by other requester.
-    #[pallet::storage]
-    #[pallet::getter(fn other_account_locs)]
-    pub type OtherAccountLocsMap<T> = StorageMap<_, Blake2_128Concat, OtherAccountId<<T as Config>::EthereumAddress>, BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs>>;
+    // #[pallet::storage]
+    // #[pallet::getter(fn other_account_locs)]
+    // pub type OtherAccountLocsMap<T> = StorageMap<_, Blake2_128Concat, OtherAccountId<<T as Config>::EthereumAddress>, BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs>>;
 
     /// Collection items by LOC ID.
     #[pallet::storage]
@@ -935,12 +937,12 @@ pub mod pallet {
         V20AddCustomLegalFee,
         V21EnableRequesterLinks,
         V22AddRecurrentFees,
-        V23BoundedLocItems,
+        V23RemoveUselessMaps,
     }
 
     impl Default for StorageVersion {
         fn default() -> StorageVersion {
-            return StorageVersion::V23BoundedLocItems;
+            return StorageVersion::V23RemoveUselessMaps;
         }
     }
 
@@ -1072,7 +1074,6 @@ pub mod pallet {
                             let requester = RequesterOf::<T>::Loc(requester_loc_id.clone());
                             let new_loc = Self::build_open_loc(&who, &requester, LocType::Transaction, None, BalanceOf::<T>::zero());
                             <LocMap<T>>::insert(loc_id, new_loc);
-                            Self::link_with_identity_loc(&requester_loc_id, &loc_id)?;
                         },
                 }
 
@@ -1467,7 +1468,6 @@ pub mod pallet {
 
                 Self::apply_legal_fee(&loc)?;
                 <LocMap<T>>::insert(loc_id, loc);
-                Self::link_with_other_account(&requester_account_id, &loc_id)?;
                 Self::link_sponsorship_to_loc(&sponsorship_id, &loc_id);
 
                 Self::deposit_event(Event::LocCreated(loc_id));
@@ -1943,44 +1943,6 @@ pub mod pallet {
 				list.try_push(loc_id.clone())
 					.map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
 				<AccountLocsMap<T>>::insert(account_id, list);
-				Ok(())
-            }
-        }
-
-        fn link_with_identity_loc(
-            requester_loc_id: &<T as Config>::LocId,
-            loc_id: &<T as Config>::LocId,
-        ) -> Result<(), sp_runtime::DispatchError> {
-            if <IdentityLocLocsMap<T>>::contains_key(requester_loc_id) {
-                <IdentityLocLocsMap<T>>::mutate(requester_loc_id, |locs| {
-                    let list = locs.as_mut().unwrap();
-					list.try_push(loc_id.clone())
-                }).map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
-				Ok(())
-            } else {
-				let mut list: BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs> = BoundedVec::new();
-				list.try_push(loc_id.clone())
-					.map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
-                <IdentityLocLocsMap<T>>::insert(requester_loc_id, list);
-				Ok(())
-            }
-        }
-
-        fn link_with_other_account(
-            account_id: &OtherAccountId<T::EthereumAddress>,
-            loc_id: &<T as Config>::LocId,
-        ) -> Result<(), sp_runtime::DispatchError> {
-            if <OtherAccountLocsMap<T>>::contains_key(account_id) {
-                <OtherAccountLocsMap<T>>::mutate(account_id, |locs| {
-                    let list = locs.as_mut().unwrap();
-					list.try_push(loc_id.clone())
-                }).map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
-				Ok(())
-            } else {
-				let mut list: BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs> = BoundedVec::new();
-				list.try_push(loc_id.clone())
-					.map_err(|_| Error::<T>::AccountLocsTooMuchData)?;
-                <OtherAccountLocsMap<T>>::insert(account_id, list);
 				Ok(())
             }
         }

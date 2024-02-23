@@ -1110,29 +1110,6 @@ fn it_creates_logion_identity_loc() {
         assert_ok!(LogionLoc::create_logion_identity_loc(RuntimeOrigin::signed(legal_officer_id(1)), LOGION_IDENTITY_LOC_ID));
 
         assert!(LogionLoc::loc(LOGION_IDENTITY_LOC_ID).is_some());
-        assert!(LogionLoc::identity_loc_locs(LOGION_IDENTITY_LOC_ID).is_none());
-
-        check_no_fees(snapshot);
-    });
-}
-
-#[test]
-fn it_creates_and_links_logion_locs_to_identity_loc() {
-    new_test_ext().execute_with(|| {
-        setup_default_balances();
-        let snapshot = BalancesSnapshot::take(legal_officer_id(1), legal_officers());
-        assert_ok!(LogionLoc::create_logion_identity_loc(RuntimeOrigin::signed(legal_officer_id(1)), LOGION_IDENTITY_LOC_ID));
-        assert_ok!(LogionLoc::close(RuntimeOrigin::signed(legal_officer_id(1)), LOGION_IDENTITY_LOC_ID, None, false));
-
-        assert_ok!(LogionLoc::create_logion_transaction_loc(RuntimeOrigin::signed(legal_officer_id(1)), LOC_ID, LOGION_IDENTITY_LOC_ID));
-        assert_ok!(LogionLoc::create_logion_transaction_loc(RuntimeOrigin::signed(legal_officer_id(1)), OTHER_LOC_ID, LOGION_IDENTITY_LOC_ID));
-
-        assert!(LogionLoc::loc(LOC_ID).is_some());
-        assert!(LogionLoc::loc(OTHER_LOC_ID).is_some());
-        assert!(LogionLoc::identity_loc_locs(LOGION_IDENTITY_LOC_ID).is_some());
-        assert!(LogionLoc::identity_loc_locs(LOGION_IDENTITY_LOC_ID).unwrap().len() == 2);
-        assert_eq!(LogionLoc::identity_loc_locs(LOGION_IDENTITY_LOC_ID).unwrap()[0], LOC_ID);
-        assert_eq!(LogionLoc::identity_loc_locs(LOGION_IDENTITY_LOC_ID).unwrap()[1], OTHER_LOC_ID);
 
         check_no_fees(snapshot);
     });
@@ -2396,9 +2373,7 @@ fn it_creates_ethereum_identity_loc() {
             collection_item_fee: 0,
             tokens_record_fee: 0,
         }));
-		let loc_ids = BoundedVec::try_from(vec![LOC_ID]).expect("Failed to create expected BoundedVec");
-        assert_eq!(LogionLoc::other_account_locs(requester_account_id), Some(loc_ids));
-        assert_eq!(LogionLoc::sponsorship(sponsorship_id).unwrap().loc_id, Some(LOC_ID));
+		assert_eq!(LogionLoc::sponsorship(sponsorship_id).unwrap().loc_id, Some(LOC_ID));
         System::assert_has_event(RuntimeEvent::LogionLoc(crate::Event::LocCreated { 0: LOC_ID }));
 
         let fees = Fees::only_legal(160 * ONE_LGNT, Beneficiary::Other);
