@@ -1,8 +1,9 @@
-use crate::{self as pallet_lo_authority_list, HostData, HostDataOf};
-use codec::{Encode, Decode};
+use crate::{self as pallet_lo_authority_list, HostDataParam, HostDataParamOf};
+use codec::{Encode, Decode, MaxEncodedLen};
 use frame_support::parameter_types;
 use frame_system::{self as system, EnsureRoot};
 use scale_info::TypeInfo;
+use sp_core::ConstU32;
 use sp_core::hash::H256;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup}, testing::Header, generic,
@@ -50,7 +51,7 @@ impl system::Config for Test {
     type MaxConsumers = frame_support::traits::ConstU32<16>;
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, Copy, MaxEncodedLen)]
 pub enum Region {
     Europe,
     Other,
@@ -75,15 +76,20 @@ impl Default for Region {
     }
 }
 
-impl Default for HostDataOf<Test> {
+impl Default for HostDataParamOf<Test> {
 
     fn default() -> Self {
-        return HostData {
+        return HostDataParam {
             node_id: None,
             base_url: None,
             region: Region::Europe,
         }
     }
+}
+
+parameter_types! {
+	#[derive(Debug, Eq, Clone, PartialEq, TypeInfo)]
+	pub const MaxBaseUrlLen: u32 = 30;
 }
 
 impl pallet_lo_authority_list::Config for Test {
@@ -93,6 +99,9 @@ impl pallet_lo_authority_list::Config for Test {
     type Region = Region;
     type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = SubstrateWeight<Test>;
+	type MaxBaseUrlLen = MaxBaseUrlLen;
+	type MaxNodes = ConstU32<3>;
+	type MaxPeerIdLength = ConstU32<48>;
 }
 
 // Build genesis storage according to the mock runtime.

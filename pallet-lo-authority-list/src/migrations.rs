@@ -4,42 +4,47 @@ use frame_support::traits::OnRuntimeUpgrade;
 
 use crate::{Config, PalletStorageVersion, pallet::StorageVersion};
 
-pub mod v4 {
+pub mod v5 {
     use super::*;
     use crate::*;
 
     #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
-    pub enum LegalOfficerDataV3<AccountId> {
-        Host(HostDataV3),
+    pub enum LegalOfficerDataV4<AccountId, Region> {
+        Host(HostDataV4<Region>),
         Guest(AccountId),
     }
 
-    pub type LegalOfficerDataV3Of<T> = LegalOfficerDataV3<
+    pub type LegalOfficerDataV4Of<T> = LegalOfficerDataV4<
         <T as frame_system::Config>::AccountId,
+        <T as pallet::Config>::Region,
     >;
 
     #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
-    pub struct HostDataV3 {
-        pub node_id: Option<PeerId>,
-        pub base_url: Option<Vec<u8>>,
+    pub struct HostDataV4<Region> {
+		pub node_id: Option<PeerId>,
+		pub base_url: Option<Vec<u8>>,
+		pub region: Region,
     }
 
-    pub struct AddRegion<T>(sp_std::marker::PhantomData<T>);
-    impl<T: Config> OnRuntimeUpgrade for AddRegion<T> {
+    pub struct BoundedBaseUrl<T>(sp_std::marker::PhantomData<T>);
+    impl<T: Config> OnRuntimeUpgrade for BoundedBaseUrl<T> {
 
         fn on_runtime_upgrade() -> Weight {
             super::do_storage_upgrade::<T, _>(
-                StorageVersion::V3GuestLegalOfficers,
                 StorageVersion::V4Region,
-                "AddRegion",
+                StorageVersion::V4Region,
+                "BoundedBaseUrl",
                 || {
-                    LegalOfficerSet::<T>::translate_values(|legal_officer_data: LegalOfficerDataV3Of<T>| {
+                    LegalOfficerSet::<T>::translate_values(|legal_officer_data: LegalOfficerDataV4Of<T>| {
                         match legal_officer_data {
-                            LegalOfficerDataV3::Guest(guest_data) => Some(LegalOfficerData::Guest(guest_data)),
-                            LegalOfficerDataV3::Host(host_data) => Some(LegalOfficerData::Host(HostData {
+                            LegalOfficerDataV4::Guest(guest_data) => Some(LegalOfficerData::Guest(guest_data)),
+                            LegalOfficerDataV4::Host(host_data) => Some(LegalOfficerData::Host(HostData {
                                 node_id: host_data.node_id.clone(),
-                                base_url: host_data.base_url.clone(),
-                                region: Default::default(),
+                                base_url: match host_data.base_url {
+									None => None,
+									Some(url) => Some(BoundedVec::try_from(url).expect("Failed to migrate base_url")),
+								},
+                                region: host_data.region.clone(),
                             })),
                         }
                     })
