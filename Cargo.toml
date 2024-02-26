@@ -8,6 +8,9 @@ members = [
     "pallet-logion-vote",
     "pallet-verified-recovery"
 ]
+exclude = [
+    "offchain-client"
+]
 resolver = "2"
 
 [profile.release]
