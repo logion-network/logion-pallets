@@ -28,6 +28,7 @@ pub struct LoAuthorityListMock;
 pub type OuterOrigin<T> = <T as frame_system::Config>::RuntimeOrigin;
 #[cfg(feature = "runtime-benchmarks")]
 use frame_system::RawOrigin;
+use scale_info::TypeInfo;
 
 impl EnsureOrigin<RuntimeOrigin> for LoAuthorityListMock {
     type Success = <Test as system::Config>::AccountId;
@@ -146,6 +147,11 @@ impl LocSetup<LocId, AccountId> for LocSetupMock {
 	}
 }
 
+parameter_types! {
+	#[derive(Debug, PartialEq, TypeInfo)]
+	pub const MaxBallots: u32 = 2;
+}
+
 impl pallet_logion_vote::Config for Test {
     type LocId = LocId;
     type RuntimeEvent = RuntimeEvent;
@@ -154,6 +160,7 @@ impl pallet_logion_vote::Config for Test {
     type LocQuery = LocQueryMock;
     type LegalOfficerCreation = LegalOfficerCreationMock;
     type WeightInfo = SubstrateWeight<Test>;
+	type MaxBallots = MaxBallots;
 	#[cfg(feature = "runtime-benchmarks")]
 	type LocSetup = LocSetupMock;
 }

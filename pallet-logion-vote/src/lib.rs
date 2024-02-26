@@ -1,6 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use codec::{Decode, Encode};
+use codec::{Decode, Encode, MaxEncodedLen};
+use frame_support::BoundedVec;
+use frame_support::traits::Get;
 use scale_info::TypeInfo;
 use sp_std::vec::Vec;
 
@@ -19,19 +21,19 @@ use benchmarking::{
 	LocSetup,
 };
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
-pub struct Vote<LocId, AccountId> {
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
+pub struct Vote<LocId, AccountId, MaxBallots: Get<u32>> {
     loc_id: LocId,
-    ballots: Vec<Ballot<AccountId>>,
+    ballots: BoundedVec<Ballot<AccountId>, MaxBallots>,
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct Ballot<AccountId> {
     voter: AccountId,
     status: BallotStatus,
 }
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub enum BallotStatus {
     NotVoted,
     VotedYes,
@@ -61,7 +63,7 @@ pub mod pallet {
     #[pallet::config]
     pub trait Config: frame_system::Config {
         /// LOC identifier
-        type LocId: Member + Parameter + Default + Copy + HasCompact;
+        type LocId: Member + Parameter + Default + Copy + HasCompact + MaxEncodedLen;
 
         /// The overarching event type.
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
@@ -81,12 +83,15 @@ pub mod pallet {
         /// Weight information for extrinsics in this pallet.
         type WeightInfo: WeightInfo;
 
+		/// Maximum number of ballots per vote - should be equal to the maximum number of Legal
+		/// Officers (cf pallet-lo-authority-list)
+		type MaxBallots: Get<u32> + TypeInfo;
+
 		#[cfg(feature = "runtime-benchmarks")]
 		type LocSetup: LocSetup<Self::LocId, Self::AccountId>;
     }
 
     #[pallet::pallet]
-    #[pallet::without_storage_info]
     pub struct Pallet<T>(_);
 
     ///
@@ -97,7 +102,7 @@ pub mod pallet {
     /// Votes
     #[pallet::storage]
     #[pallet::getter(fn votes)]
-    pub type Votes<T> = StorageMap<_, Blake2_128Concat, VoteId, Vote<<T as Config>::LocId, <T as frame_system::Config>::AccountId>>;
+    pub type Votes<T> = StorageMap<_, Blake2_128Concat, VoteId, Vote<<T as Config>::LocId, <T as frame_system::Config>::AccountId, <T as crate::pallet::Config>::MaxBallots>>;
 
     #[pallet::event]
     #[pallet::generate_deposit(pub (super) fn deposit_event)]
@@ -118,6 +123,8 @@ pub mod pallet {
         NotAllowed,
         /// User has already voted on given vote.
         AlreadyVoted,
+		/// There are too much ballots in the vote
+		TooMuchBallots,
     }
 
     #[pallet::call]
@@ -132,10 +139,15 @@ pub mod pallet {
             let who = T::IsLegalOfficer::ensure_origin(origin.clone())?;
             let legal_officers = T::IsLegalOfficer::legal_officers();
             if T::LocValidity::loc_valid_with_owner(&loc_id, &who) {
-                let ballots: Vec<Ballot<<T as frame_system::Config>::AccountId>> = legal_officers
+                let all_ballots: Vec<Ballot<<T as frame_system::Config>::AccountId>> = legal_officers
                     .iter()
                     .map(|legal_officer| Ballot { voter: legal_officer.clone(), status: BallotStatus::NotVoted })
                     .collect();
+
+
+				let ballots: BoundedVec<Ballot<<T as frame_system::Config>::AccountId>, <T as pallet::Config>::MaxBallots> = BoundedVec::try_from(all_ballots)
+					.map_err(|_| Error::<T>::TooMuchBallots)?;
+
                 let vote_id = <LastVoteId<T>>::get() + 1;
                 <Votes<T>>::insert(vote_id, Vote {
                     loc_id,
