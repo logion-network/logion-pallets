@@ -951,6 +951,23 @@ pub mod pallet {
     #[pallet::getter(fn pallet_storage_version)]
     pub type PalletStorageVersion<T> = StorageValue<_, StorageVersion, ValueQuery>;
 
+	#[pallet::genesis_config]
+	pub struct GenesisConfig<T: Config>(PhantomData<T>);
+
+	impl<T: Config> Default for GenesisConfig<T> {
+		fn default() -> Self {
+			Self(PhantomData::<T>)
+		}
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+
+		fn build(&self) {
+			PalletStorageVersion::<T>::put(StorageVersion::default());
+		}
+	}
+
     #[pallet::call]
     impl<T: Config> Pallet<T> {
 
