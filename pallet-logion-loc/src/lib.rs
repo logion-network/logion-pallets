@@ -664,19 +664,7 @@ pub mod pallet {
     #[pallet::getter(fn account_locs)]
     pub type AccountLocsMap<T> = StorageMap<_, Blake2_128Concat, <T as frame_system::Config>::AccountId, BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs>>;
 
-	// TO REMOVE
-    /// Requested LOCs by logion Identity LOC.
-    // #[pallet::storage]
-    // #[pallet::getter(fn identity_loc_locs)]
-    // pub type IdentityLocLocsMap<T> = StorageMap<_, Blake2_128Concat, <T as Config>::LocId, BoundedVec<<T as crate::pallet::Config>::LocId, <T as Config>::MaxAccountLocs>>;
-
-	// TO REMOVE
-    /// Requested LOCs by other requester.
-    // #[pallet::storage]
-    // #[pallet::getter(fn other_account_locs)]
-    // pub type OtherAccountLocsMap<T> = StorageMap<_, Blake2_128Concat, OtherAccountId<<T as Config>::EthereumAddress>, BoundedVec<<T as Config>::LocId, <T as Config>::MaxAccountLocs>>;
-
-    /// Collection items by LOC ID.
+	/// Collection items by LOC ID.
     #[pallet::storage]
     #[pallet::getter(fn collection_items)]
     pub type CollectionItemsMap<T> = StorageDoubleMap<_, Blake2_128Concat, <T as Config>::LocId, Blake2_128Concat, <T as Config>::CollectionItemId, CollectionItemOf<T>>;
@@ -950,6 +938,23 @@ pub mod pallet {
     #[pallet::storage]
     #[pallet::getter(fn pallet_storage_version)]
     pub type PalletStorageVersion<T> = StorageValue<_, StorageVersion, ValueQuery>;
+
+	#[pallet::genesis_config]
+	pub struct GenesisConfig<T: Config>(PhantomData<T>);
+
+	impl<T: Config> Default for GenesisConfig<T> {
+		fn default() -> Self {
+			Self(PhantomData::<T>)
+		}
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+
+		fn build(&self) {
+			PalletStorageVersion::<T>::put(StorageVersion::default());
+		}
+	}
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
