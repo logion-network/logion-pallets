@@ -5,12 +5,13 @@ use frame_support::traits::Len;
 use frame_system::pallet_prelude::{BlockNumberFor, OriginFor};
 use sp_core::{H160, H256};
 use sp_core::bounded::BoundedVec;
+use sp_runtime::DispatchError::BadOrigin;
 use sp_runtime::traits::BlakeTwo256;
 use sp_runtime::traits::Hash;
 
 use logion_shared::{Beneficiary, LocQuery, LocValidity};
 
-use crate::{CollectionItem, CollectionItemFile, CollectionItemToken, Config, Error, fees::*, File, FileParams, Hasher, ItemsParams, ItemsParamsOf, LegalOfficerCase, LocLink, LocLinkParams, LocType, MetadataItem, MetadataItemParams, mock::*, OtherAccountId, Requester::{Account, OtherAccount}, SupportedAccountId, TermsAndConditionsElement, TermsAndConditionsElementOf, TokensRecordFile, TokensRecordFileOf, VerifiedIssuer};
+use crate::{CollectionItem, CollectionItemFile, CollectionItemToken, Config, Error, fees::*, File, FileParams, Hasher, Items, ItemsOf, ItemsParams, ItemsParamsOf, LegalOfficerCase, LocLink, LocLinkParams, LocType, LocVoidInfo, MetadataItem, MetadataItemParams, mock::*, OtherAccountId, Requester::{Account, OtherAccount}, Requester, RequesterOf, SupportedAccountId, TermsAndConditionsElement, TermsAndConditionsElementOf, TokensRecordFile, TokensRecordFileOf, VerifiedIssuer};
 
 const LOC_ID: u32 = 0;
 const OTHER_LOC_ID: u32 = 1;
@@ -57,6 +58,7 @@ fn it_creates_loc_with_default_legal_fee() {
             legal_fee: OTHER_LOC_DEFAULT_LEGAL_FEE,
             collection_item_fee: 0,
             tokens_record_fee: 0,
+            imported: false,
         }));
 
         let fees = Fees::only_legal(2000 * ONE_LGNT, Beneficiary::LegalOfficer(legal_officer_id(1)));
@@ -105,6 +107,7 @@ fn it_creates_loc_with_custom_legal_fee() {
             legal_fee: custom_legal_fee,
             collection_item_fee: 0,
             tokens_record_fee: 0,
+            imported: false,
         }));
 
         let fees = Fees::only_legal(custom_legal_fee, Beneficiary::LegalOfficer(legal_officer_id(1)));
@@ -1194,6 +1197,7 @@ fn it_creates_collection_loc() {
             legal_fee: OTHER_LOC_DEFAULT_LEGAL_FEE,
             collection_item_fee: 0,
             tokens_record_fee: 0,
+            imported: false,
         }));
 
         let fees = Fees::only_legal(2000 * ONE_LGNT, Beneficiary::LegalOfficer(legal_officer_id(1)));
@@ -2372,6 +2376,7 @@ fn it_creates_ethereum_identity_loc() {
             legal_fee: ID_LOC_DEFAULT_LEGAL_FEE,
             collection_item_fee: 0,
             tokens_record_fee: 0,
+            imported: false,
         }));
 		assert_eq!(LogionLoc::sponsorship(sponsorship_id).unwrap().loc_id, Some(LOC_ID));
         System::assert_has_event(RuntimeEvent::LogionLoc(crate::Event::LocCreated { 0: LOC_ID }));
@@ -2406,6 +2411,7 @@ fn it_creates_polkadot_identity_loc() {
             legal_fee: ID_LOC_DEFAULT_LEGAL_FEE,
             collection_item_fee: 0,
             tokens_record_fee: 0,
+            imported: false,
         }));
 		let loc_ids = BoundedVec::try_from(vec![LOC_ID]).expect("Failed to create expected BoundedVec");
         assert_eq!(LogionLoc::account_locs(LOC_REQUESTER_ID), Some(loc_ids));
@@ -2555,6 +2561,7 @@ fn it_reserves_value_fees() {
             legal_fee: OTHER_LOC_DEFAULT_LEGAL_FEE,
             collection_item_fee: 0,
             tokens_record_fee: 0,
+            imported: false,
         }));
 
         let expected_free_balance = INITIAL_BALANCE.saturating_sub(legal_fee).saturating_sub(value_fee);
@@ -3389,4 +3396,309 @@ fn it_fails_to_set_invited_contributor_selection_on_void_loc() {
 #[test]
 fn it_adds_tokens_record_as_invited_contributor() {
 	it_adds_tokens_record(INVITED_CONTRIBUTOR_ID);
+}
+
+#[test]
+fn it_fails_importing_not_root() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let items = build_items(false);
+
+        assert_err!(LogionLoc::import_loc(
+            RuntimeOrigin::signed(LOC_REQUESTER_ID),
+            LOC_ID,
+            LOC_REQUESTER,
+            legal_officer_id(1),
+            LocType::Transaction,
+            items,
+            None,
+            None,
+            false,
+            0,
+            0,
+            0,
+            0,
+            None,
+            None,
+            None,
+            None,
+            false,
+        ), BadOrigin);
+    });
+}
+
+fn build_items(closed: bool) -> ItemsOf<Test> {
+    let metadata = MetadataItem {
+        name: sha256(&vec![1, 2, 3]),
+        value: sha256(&vec![4, 5, 6]),
+        submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        acknowledged_by_owner: closed,
+        acknowledged_by_verified_issuer: closed,
+    };
+    let file = File {
+        hash: sha256(&"test".as_bytes().to_vec()),
+        nature: sha256(&"Test".as_bytes().to_vec()),
+        submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        size: 4,
+        acknowledged_by_owner: closed,
+        acknowledged_by_verified_issuer: closed,
+    };
+    let link = LocLink {
+        id: OTHER_LOC_ID,
+        nature: sha256(&"test-link-nature".as_bytes().to_vec()),
+        submitter: SupportedAccountId::Polkadot(LOC_REQUESTER_ID),
+        acknowledged_by_owner: closed,
+        acknowledged_by_verified_issuer: closed,
+    };
+    Items {
+        metadata: Vec::from([ metadata.clone() ]),
+        files: Vec::from([ file.clone() ]),
+        links: Vec::from([ link.clone() ]),
+    }
+}
+
+#[test]
+fn it_imports_open_transaction_loc() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        test_import_loc(
+            LOC_REQUESTER,
+            LocType::Transaction,
+            false,
+            false,
+        );
+    });
+}
+
+fn test_import_loc(
+    requester: RequesterOf<Test>,
+    loc_type: LocType,
+    closed: bool,
+    void: bool,
+) {
+    let items = build_items(closed);
+
+    let mut void_info = None;
+    let mut replacer_of = None;
+    if void {
+        void_info = Some(LocVoidInfo {
+            replacer: Some(OTHER_LOC_ID),
+        });
+    } else {
+        replacer_of = Some(OTHER_LOC_ID);
+    }
+
+    let mut seal = None;
+    if loc_type == LocType::Identity && closed {
+        seal = Some(sha256(&vec![42]));
+    }
+
+    let mut legal_fee = 2000;
+    if loc_type == LocType::Identity {
+        legal_fee = 160;
+    }
+
+    let mut collection_last_block_submission = None;
+    let mut collection_max_size = None;
+    let mut collection_can_upload = false;
+    let mut value_fee = 0;
+    let mut collection_item_fee = 0;
+    let mut tokens_record_fee = 0;
+    if loc_type == LocType::Collection {
+        collection_last_block_submission = Some(424242);
+        collection_max_size = Some(200);
+        collection_can_upload = true;
+        value_fee = 200;
+        collection_item_fee = 10;
+        tokens_record_fee = 20;
+    }
+
+    let mut sponsorship_id = None;
+    match requester {
+        OtherAccount(_) => sponsorship_id = Some(1u32),
+        _ => {},
+    }
+
+    assert_ok!(LogionLoc::import_loc(
+        RuntimeOrigin::root(),
+        LOC_ID,
+        requester.clone(),
+        legal_officer_id(1),
+        loc_type,
+        items.clone(),
+        collection_last_block_submission,
+        collection_max_size,
+        collection_can_upload,
+        value_fee,
+        legal_fee,
+        collection_item_fee,
+        tokens_record_fee,
+        sponsorship_id,
+        seal,
+        void_info.clone(),
+        replacer_of.clone(),
+        closed,
+    ));
+    System::assert_has_event(RuntimeEvent::LogionLoc(crate::Event::LocImported {
+        0: LOC_ID,
+    }));
+    assert_eq!(LogionLoc::loc(LOC_ID), Some(LegalOfficerCase {
+        owner: legal_officer_id(1),
+        requester: requester.clone(),
+        metadata: BoundedVec::try_from(Vec::from(items.metadata)).unwrap(),
+        files: BoundedVec::try_from(Vec::from(items.files)).unwrap(),
+        closed,
+        loc_type,
+        links: BoundedVec::try_from(Vec::from(items.links)).unwrap(),
+        void_info,
+        replacer_of,
+        collection_last_block_submission,
+        collection_max_size,
+        collection_can_upload,
+        seal,
+        sponsorship_id,
+        value_fee,
+        legal_fee,
+        collection_item_fee,
+        tokens_record_fee,
+        imported: true,
+    }));
+    match requester {
+        Account(requester_account_id) => assert!(
+            LogionLoc::account_locs(requester_account_id).is_some()
+        ),
+        _ => {},
+    }
+}
+
+#[test]
+fn it_imports_closed_transaction_loc() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        test_import_loc(
+            LOC_REQUESTER,
+            LocType::Transaction,
+            true,
+            false,
+        );
+    });
+}
+
+#[test]
+fn it_imports_void_transaction_loc() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        test_import_loc(
+            LOC_REQUESTER,
+            LocType::Transaction,
+            true,
+            true,
+        );
+    });
+}
+
+#[test]
+fn it_imports_open_identity_loc() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        test_import_loc(
+            LOC_REQUESTER,
+            LocType::Identity,
+            false,
+            false,
+        );
+    });
+}
+
+#[test]
+fn it_imports_closed_identity_loc() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        test_import_loc(
+            LOC_REQUESTER,
+            LocType::Identity,
+            true,
+            false,
+        );
+    });
+}
+
+#[test]
+fn it_imports_void_identity_loc() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        test_import_loc(
+            LOC_REQUESTER,
+            LocType::Identity,
+            true,
+            true,
+        );
+    });
+}
+
+#[test]
+fn it_imports_open_collection_loc() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        test_import_loc(
+            LOC_REQUESTER,
+            LocType::Collection,
+            false,
+            false,
+        );
+    });
+}
+
+#[test]
+fn it_imports_closed_collection_loc() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        test_import_loc(
+            LOC_REQUESTER,
+            LocType::Collection,
+            true,
+            false,
+        );
+    });
+}
+
+#[test]
+fn it_imports_void_collection_loc() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        test_import_loc(
+            LOC_REQUESTER,
+            LocType::Collection,
+            true,
+            true,
+        );
+    });
+}
+
+#[test]
+fn it_imports_open_identity_loc_other_account() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let ethereum_account = H160::from_str("0x900edc98db53508e6742723988b872dd08cd09c2").unwrap();
+        let requester = OtherAccountId::Ethereum(ethereum_account);
+        test_import_loc(
+            Requester::OtherAccount(requester),
+            LocType::Identity,
+            false,
+            false,
+        );
+    });
+}
+
+#[test]
+fn it_imports_open_identity_loc_logion() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        test_import_loc(
+            Requester::None,
+            LocType::Identity,
+            false,
+            false,
+        );
+    });
 }
