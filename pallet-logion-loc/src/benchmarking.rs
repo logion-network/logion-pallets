@@ -78,28 +78,26 @@ mod benchmarks {
 	use super::*;
 
 	// Benchmark `create_polkadot_identity_loc` extrinsic with the worst possible conditions:
-	// * LOC with "many" files, metadata and links.
-	//
-	// TODO: put a limit on the number of items (otherwise, no bounded worst case)
+	// * LOC with max files, metadata and links.
 	#[benchmark]
 	fn create_polkadot_identity_loc() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
-		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(requester_identity_loc::<T>()), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
-		let items = many_items::<T>(&requester);
-		let next_loc_id: T::LocId = T::LocIdFactory::loc_id(NEXT_LOC_ID);
+		let items = max_items::<T>(&requester);
+		let loc_id: T::LocId = T::LocIdFactory::loc_id(next_loc_id::<T>());
 
 		#[extrinsic_call]
 		_(
 			RawOrigin::Signed(requester),
-			next_loc_id,
+			loc_id,
 			legal_officer_id,
 			0u32.into(),
 			items,
 		);
 
-		assert!(LogionLoc::<T>::loc(next_loc_id).is_some());
+		assert!(LogionLoc::<T>::loc(loc_id).is_some());
 
 		Ok(())
 	}
@@ -122,17 +120,15 @@ mod benchmarks {
 	}
 
 	// Benchmark `create_polkadot_transaction_loc` extrinsic with the worst possible conditions:
-	// * LOC with "many" files, metadata and links.
-	//
-	// TODO: put a limit on the number of items (otherwise, no bounded worst case)
+	// * LOC with max files, metadata and links.
 	#[benchmark]
 	fn create_polkadot_transaction_loc() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
-		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(requester_identity_loc::<T>()), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
-		let items = many_items::<T>(&requester);
-		let next_loc_id: T::LocId = T::LocIdFactory::loc_id(NEXT_LOC_ID);
+		let items = max_items::<T>(&requester);
+		let next_loc_id: T::LocId = T::LocIdFactory::loc_id(next_loc_id::<T>());
 
 		#[extrinsic_call]
 		_(
@@ -178,17 +174,15 @@ mod benchmarks {
 	}
 
 	// Benchmark `create_collection_loc` extrinsic with the worst possible conditions:
-	// * LOC with "many" files, metadata and links.
-	//
-	// TODO: put a limit on the number of items (otherwise, no bounded worst case)
+	// * LOC with max files, metadata and links.
 	#[benchmark]
 	fn create_collection_loc() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
-		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(requester_identity_loc::<T>()), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
-		let items = many_items::<T>(&requester);
-		let next_loc_id: T::LocId = T::LocIdFactory::loc_id(NEXT_LOC_ID);
+		let items = max_items::<T>(&requester);
+		let next_loc_id: T::LocId = T::LocIdFactory::loc_id(next_loc_id::<T>());
 
 		#[extrinsic_call]
 		_(
@@ -211,65 +205,59 @@ mod benchmarks {
 	}
 
 	// Benchmark `add_metadata` extrinsic with the worst possible conditions:
-	// * LOC has already "many" metadata items
-	//
-	// TODO: put a limit on the number of items (otherwise, no bounded worst case)
+	// * LOC has already max metadata items
 	#[benchmark]
 	fn add_metadata() -> Result<(), BenchmarkError> {
 		let (loc_id, requester) = setup_empty_loc::<T>();
-		add_many_metadata::<T>(&loc_id, &requester);
+		add_many_metadata::<T>(&loc_id, &requester, 1);
 
 		#[extrinsic_call]
 		_(
 			RawOrigin::Signed(requester.clone()),
 			loc_id,
-			metadata_item::<T>(MANY_ITEMS, &requester),
+			metadata_item::<T>(T::MaxLocMetadata::get() - 1, &requester),
 		);
 
 		Ok(())
 	}
 
 	// Benchmark `add_file` extrinsic with the worst possible conditions:
-	// * LOC has already "many" files
-	//
-	// TODO: put a limit on the number of items (otherwise, no bounded worst case)
+	// * LOC has already max files
 	#[benchmark]
 	fn add_file() -> Result<(), BenchmarkError> {
 		let (loc_id, requester) = setup_empty_loc::<T>();
-		add_many_files::<T>(&loc_id, &requester);
+		add_many_files::<T>(&loc_id, &requester, 1);
 
 		#[extrinsic_call]
 		_(
 			RawOrigin::Signed(requester.clone()),
 			loc_id,
-			file::<T>(MANY_ITEMS, &requester),
+			file::<T>(T::MaxLocFiles::get() - 1, &requester),
 		);
 
 		Ok(())
 	}
 
 	// Benchmark `add_link` extrinsic with the worst possible conditions:
-	// * LOC has already "many" files
-	//
-	// TODO: put a limit on the number of items (otherwise, no bounded worst case)
+	// * LOC has already max files
 	#[benchmark]
 	fn add_link() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
-		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(requester_identity_loc::<T>()), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 		create_locs_to_link_to::<T>(&requester); // Targets of the many links
-		create_loc::<T>(T::LocIdFactory::loc_id(MANY_ITEMS), &legal_officer_id, &requester); // New target
+		create_loc::<T>(T::LocIdFactory::loc_id(T::MaxLocLinks::get()), &legal_officer_id, &requester); // New target
 
-		let loc_id: T::LocId = T::LocIdFactory::loc_id(MANY_ITEMS + 1);
+		let loc_id: T::LocId = T::LocIdFactory::loc_id(T::MaxLocLinks::get() + 1);
 		create_loc::<T>(loc_id, &legal_officer_id, &requester);
-		add_many_links::<T>(&loc_id, &requester);
+		add_many_links::<T>(&loc_id, &requester, 1);
 
 		#[extrinsic_call]
 		_(
 			RawOrigin::Signed(requester.clone()),
 			loc_id,
-			loc_link::<T>(MANY_ITEMS, &requester),
+			loc_link::<T>(T::MaxLocLinks::get() - 1, &requester),
 		);
 
 		Ok(())
@@ -309,14 +297,12 @@ mod benchmarks {
 	}
 
 	// Benchmark `add_collection_item` extrinsic with the worst possible conditions:
-	// * LOC has already "many" files
-	//
-	// TODO: put a limit on the number of files (otherwise, no bounded worst case)
+	// * LOC has already max files
 	#[benchmark]
 	fn add_collection_item() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
-		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(requester_identity_loc::<T>()), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 
 		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
@@ -486,7 +472,7 @@ mod benchmarks {
 	fn add_tokens_record() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
-		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(requester_identity_loc::<T>()), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 
 		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
@@ -600,20 +586,18 @@ mod benchmarks {
 	}
 
 	// Benchmark `acknowledge_metadata` extrinsic with the worst possible conditions:
-	// * LOC with "many" metadata items.
+	// * LOC with max metadata items.
 	// * Acknowledge last item.
-	//
-	// TODO: put a limit on the number of items (otherwise, no bounded worst case)
 	#[benchmark]
 	fn acknowledge_metadata() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
-		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(requester_identity_loc::<T>()), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 
 		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
 		let items = ItemsParams {
-			metadata: many_metadata::<T>(&requester),
+			metadata: max_metadata::<T>(&requester),
 			files: Vec::new(),
 			links: Vec::new(),
 		};
@@ -629,28 +613,26 @@ mod benchmarks {
 		_(
 			RawOrigin::Signed(legal_officer_id.clone()),
 			loc_id,
-			T::Hasher::hash(&Vec::from([(MANY_ITEMS - 1) as u8])),
+			T::Hasher::hash(&Vec::from([(T::MaxLocMetadata::get() - 1) as u8])),
 		);
 
 		Ok(())
 	}
 
 	// Benchmark `acknowledge_file` extrinsic with the worst possible conditions:
-	// * LOC with "many" files.
+	// * LOC with max files.
 	// * Acknowledge last item.
-	//
-	// TODO: put a limit on the number of items (otherwise, no bounded worst case)
 	#[benchmark]
 	fn acknowledge_file() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
-		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(requester_identity_loc::<T>()), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 
 		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
 		let items = ItemsParams {
 			metadata: Vec::new(),
-			files: many_files::<T>(&requester),
+			files: max_files::<T>(&requester),
 			links: Vec::new(),
 		};
 		assert_ok!(LogionLoc::<T>::create_polkadot_transaction_loc(
@@ -665,30 +647,28 @@ mod benchmarks {
 		_(
 			RawOrigin::Signed(legal_officer_id.clone()),
 			loc_id,
-			T::Hasher::hash(&Vec::from([(MANY_ITEMS - 1) as u8])),
+			T::Hasher::hash(&Vec::from([(T::MaxLocFiles::get() - 1) as u8])),
 		);
 
 		Ok(())
 	}
 
 	// Benchmark `acknowledge_link` extrinsic with the worst possible conditions:
-	// * LOC with "many" files.
+	// * LOC with max links.
 	// * Acknowledge last item.
-	//
-	// TODO: put a limit on the number of items (otherwise, no bounded worst case)
 	#[benchmark]
 	fn acknowledge_link() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
-		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(requester_identity_loc::<T>()), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
 		create_locs_to_link_to::<T>(&requester); // Targets of the many links
 
-		let loc_id: T::LocId = T::LocIdFactory::loc_id(MANY_ITEMS);
+		let loc_id: T::LocId = T::LocIdFactory::loc_id(T::MaxLocLinks::get());
 		let items = ItemsParams {
 			metadata: Vec::new(),
 			files: Vec::new(),
-			links: many_loc_links::<T>(&requester),
+			links: max_loc_links::<T>(&requester),
 		};
 		assert_ok!(LogionLoc::<T>::create_polkadot_transaction_loc(
 			<T as frame_system::Config>::RuntimeOrigin::from(RawOrigin::Signed(requester.clone())),
@@ -702,25 +682,23 @@ mod benchmarks {
 		_(
 			RawOrigin::Signed(legal_officer_id.clone()),
 			loc_id,
-			T::LocIdFactory::loc_id(MANY_ITEMS - 1),
+			T::LocIdFactory::loc_id(T::MaxLocLinks::get() - 1),
 		);
 
 		Ok(())
 	}
 
 	// Benchmark `close` extrinsic with the worst possible conditions:
-	// * LOC with "many" items.
+	// * LOC with max items.
 	// * With auto-ack.
-	//
-	// TODO: put a limit on the number of items (otherwise, no bounded worst case)
 	#[benchmark]
 	fn close() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
-		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(requester_identity_loc::<T>()), &legal_officer_id, &requester);
 		ensure_enough_funds::<T>(&requester);
-		let items = many_items::<T>(&requester);
-		let next_loc_id: T::LocId = T::LocIdFactory::loc_id(NEXT_LOC_ID);
+		let items = max_items::<T>(&requester);
+		let next_loc_id: T::LocId = T::LocIdFactory::loc_id(next_loc_id::<T>());
 
 		assert_ok!(LogionLoc::<T>::create_polkadot_identity_loc(
 			<T as frame_system::Config>::RuntimeOrigin::from(RawOrigin::Signed(requester.clone())),
@@ -746,12 +724,12 @@ mod benchmarks {
 	fn set_invited_contributor_selection() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
 		let requester: T::AccountId = account("requester", 1, SEED);
-		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(requester_identity_loc::<T>()), &legal_officer_id, &requester);
 
 		ensure_enough_funds::<T>(&requester);
 
 		let invited_contributor: T::AccountId = account("invited_contributor", 1, SEED);
-		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(INVITED_CONTRIBUTOR_IDENTITY_LOC_ID), &legal_officer_id, &invited_contributor);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(invited_contributor_identity_loc::<T>()), &legal_officer_id, &invited_contributor);
 
 		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
 		assert_ok!(LogionLoc::<T>::create_collection_loc(
@@ -789,6 +767,44 @@ mod benchmarks {
 		Ok(())
 	}
 
+	// Benchmark `import_loc` extrinsic with the worst possible conditions:
+	// * Requester is Polkadot address -> AccountLocsMap is updated
+	// * LOC with max files, metadata and links.
+	#[benchmark]
+	fn import_loc() -> Result<(), BenchmarkError> {
+		let legal_officer_id = any_legal_officer::<T>();
+		let requester_account: T::AccountId = account("requester", 1, SEED);
+		let requester = Account(requester_account.clone());
+		let items = many_items_import::<T>(&requester_account);
+		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
+
+		#[extrinsic_call]
+		_(
+			RawOrigin::Root,
+			loc_id,
+			requester,
+			legal_officer_id,
+			LocType::Transaction,
+			items,
+			None,
+			None,
+			false,
+			0u32.into(),
+			0u32.into(),
+			0u32.into(),
+			0u32.into(),
+			None,
+			None,
+			None,
+			None,
+			false,
+		);
+
+		assert!(LogionLoc::<T>::loc(loc_id).is_some());
+
+		Ok(())
+	}
+
 	impl_benchmark_test_suite! {
 		LogionLoc,
 		crate::mock::new_test_ext(),
@@ -807,12 +823,12 @@ fn ensure_enough_funds<T: pallet::Config>(account_id: &T::AccountId) {
 	T::Currency::make_free_balance_be(account_id, BalanceOf::<T>::max_value());
 }
 
-fn many_items<T: pallet::Config>(requester: &T::AccountId) -> ItemsParamsOf<T> {
+fn max_items<T: pallet::Config>(requester: &T::AccountId) -> ItemsParamsOf<T> {
 	create_locs_to_link_to::<T>(requester);
 
-	let metadata = many_metadata::<T>(requester);
-	let files = many_files::<T>(requester);
-	let links = many_loc_links::<T>(requester);
+	let metadata = max_metadata::<T>(requester);
+	let files = max_files::<T>(requester);
+	let links = max_loc_links::<T>(requester);
 	ItemsParams {
 		metadata,
 		files,
@@ -820,25 +836,25 @@ fn many_items<T: pallet::Config>(requester: &T::AccountId) -> ItemsParamsOf<T> {
 	}
 }
 
-fn many_metadata<T: pallet::Config>(requester: &T::AccountId) -> Vec<MetadataItemParamsOf<T>> {
+fn max_metadata<T: pallet::Config>(requester: &T::AccountId) -> Vec<MetadataItemParamsOf<T>> {
 	let mut metadata: Vec<MetadataItemParamsOf<T>> = Vec::new();
-	for i in 0..MANY_ITEMS {
+	for i in 0..T::MaxLocMetadata::get() {
 		metadata.push(metadata_item::<T>(i, requester));
 	}
 	metadata
 }
 
-fn many_files<T: pallet::Config>(requester: &T::AccountId) -> Vec<FileParamsOf<T>> {
+fn max_files<T: pallet::Config>(requester: &T::AccountId) -> Vec<FileParamsOf<T>> {
 	let mut files: Vec<FileParamsOf<T>> = Vec::new();
-	for i in 0..MANY_ITEMS {
+	for i in 0..T::MaxLocFiles::get() {
 		files.push(file::<T>(i, requester));
 	}
 	files
 }
 
-fn many_loc_links<T: pallet::Config>(requester: &T::AccountId) -> Vec<LocLinkParamsOf<T>> {
+fn max_loc_links<T: pallet::Config>(requester: &T::AccountId) -> Vec<LocLinkParamsOf<T>> {
 	let mut links: Vec<LocLinkParamsOf<T>> = Vec::new();
-	for i in 0..MANY_ITEMS {
+	for i in 0..T::MaxLocLinks::get() {
 		links.push(loc_link::<T>(i, requester));
 	}
 	links
@@ -871,7 +887,7 @@ fn loc_link<T: pallet::Config>(i: u32, submitter: &T::AccountId) -> LocLinkParam
 
 fn create_locs_to_link_to<T: pallet::Config>(requester: &T::AccountId) {
 	let legal_officer_id = any_legal_officer::<T>();
-	for i in 0..MANY_ITEMS {
+	for i in 0..T::MaxLocLinks::get() {
 		create_loc::<T>(T::LocIdFactory::loc_id(i), &legal_officer_id, requester);
 	}
 }
@@ -910,23 +926,30 @@ fn create_closed_polkadot_identity_loc<T: pallet::Config>(loc_id: T::LocId, lega
 	));
 }
 
-const MANY_ITEMS: u32 = 10;
-const NEXT_LOC_ID: u32 = MANY_ITEMS;
-const REQUESTER_IDENTITY_LOC_ID: u32 = NEXT_LOC_ID + 2;
-const INVITED_CONTRIBUTOR_IDENTITY_LOC_ID: u32 = NEXT_LOC_ID + 3;
+fn next_loc_id<T: pallet::Config>() -> u32 {
+	T::MaxLocLinks::get()
+}
+
+fn requester_identity_loc<T: pallet::Config>() -> u32 {
+	next_loc_id::<T>() + 2
+}
+
+fn invited_contributor_identity_loc<T: pallet::Config>() -> u32 {
+	next_loc_id::<T>() + 3
+}
 
 fn setup_empty_loc<T: pallet::Config>() -> (T::LocId, T::AccountId) {
 	let legal_officer_id = any_legal_officer::<T>();
 	let requester: T::AccountId = account("requester", 1, SEED);
-	create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(REQUESTER_IDENTITY_LOC_ID), &legal_officer_id, &requester);
+	create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(requester_identity_loc::<T>()), &legal_officer_id, &requester);
 	ensure_enough_funds::<T>(&requester);
 	let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
 	create_loc::<T>(loc_id, &legal_officer_id, &requester);
 	(loc_id, requester)
 }
 
-fn add_many_metadata<T: pallet::Config>(loc_id: &T::LocId, requester: &T::AccountId) {
-	for i in 0..MANY_ITEMS {
+fn add_many_metadata<T: pallet::Config>(loc_id: &T::LocId, requester: &T::AccountId, reserve: u32) {
+	for i in 0..T::MaxLocMetadata::get() - reserve {
 		assert_ok!(LogionLoc::<T>::add_metadata(
 			<T as frame_system::Config>::RuntimeOrigin::from(RawOrigin::Signed(requester.clone())),
 			*loc_id,
@@ -935,8 +958,8 @@ fn add_many_metadata<T: pallet::Config>(loc_id: &T::LocId, requester: &T::Accoun
 	}
 }
 
-fn add_many_files<T: pallet::Config>(loc_id: &T::LocId, requester: &T::AccountId) {
-	for i in 0..MANY_ITEMS {
+fn add_many_files<T: pallet::Config>(loc_id: &T::LocId, requester: &T::AccountId, reserve: u32) {
+	for i in 0..T::MaxLocFiles::get() - reserve {
 		assert_ok!(LogionLoc::<T>::add_file(
 			<T as frame_system::Config>::RuntimeOrigin::from(RawOrigin::Signed(requester.clone())),
 			*loc_id,
@@ -945,8 +968,8 @@ fn add_many_files<T: pallet::Config>(loc_id: &T::LocId, requester: &T::AccountId
 	}
 }
 
-fn add_many_links<T: pallet::Config>(loc_id: &T::LocId, requester: &T::AccountId) {
-	for i in 0..MANY_ITEMS {
+fn add_many_links<T: pallet::Config>(loc_id: &T::LocId, requester: &T::AccountId, reserve: u32) {
+	for i in 0..T::MaxLocLinks::get() - reserve {
 		assert_ok!(LogionLoc::<T>::add_link(
 			<T as frame_system::Config>::RuntimeOrigin::from(RawOrigin::Signed(requester.clone())),
 			*loc_id,
@@ -966,4 +989,70 @@ fn max_tokens_record_files<T: pallet::Config>() -> Vec<TokensRecordFileOf<T>> {
 		});
 	}
 	files
+}
+
+fn many_items_import<T: pallet::Config>(requester: &T::AccountId) -> ItemsOf<T> {
+	let metadata = many_metadata_import::<T>(requester);
+	let files = many_files_import::<T>(requester);
+	let links = many_loc_links_import::<T>(requester);
+	Items {
+		metadata,
+		files,
+		links,
+	}
+}
+
+fn many_metadata_import<T: pallet::Config>(requester: &T::AccountId) -> Vec<MetadataItemOf<T>> {
+	let mut metadata: Vec<MetadataItemOf<T>> = Vec::new();
+	for i in 0..T::MaxLocMetadata::get() {
+		metadata.push(metadata_item_import::<T>(i, requester));
+	}
+	metadata
+}
+
+fn metadata_item_import<T: pallet::Config>(i: u32, submitter: &T::AccountId) -> MetadataItemOf<T> {
+	MetadataItem {
+		name: T::Hasher::hash(&Vec::from([i as u8])),
+		value: T::Hasher::hash(&Vec::from([i as u8])),
+		submitter: SupportedAccountId::Polkadot(submitter.clone()),
+		acknowledged_by_owner: false,
+		acknowledged_by_verified_issuer: false,
+	}
+}
+
+fn many_files_import<T: pallet::Config>(requester: &T::AccountId) -> Vec<FileOf<T>> {
+	let mut files: Vec<FileOf<T>> = Vec::new();
+	for i in 0..T::MaxLocFiles::get() {
+		files.push(file_import::<T>(i, requester));
+	}
+	files
+}
+
+fn file_import<T: pallet::Config>(i: u32, submitter: &T::AccountId) -> FileOf<T> {
+	File {
+		hash: T::Hasher::hash(&Vec::from([i as u8])),
+		nature: T::Hasher::hash(&Vec::from([i as u8])),
+		submitter: SupportedAccountId::Polkadot(submitter.clone()),
+		size: 0,
+		acknowledged_by_owner: false,
+		acknowledged_by_verified_issuer: false,
+	}
+}
+
+fn many_loc_links_import<T: pallet::Config>(requester: &T::AccountId) -> Vec<LocLinkOf<T>> {
+	let mut links: Vec<LocLinkOf<T>> = Vec::new();
+	for i in 0..T::MaxLocLinks::get() {
+		links.push(loc_link_import::<T>(i, requester));
+	}
+	links
+}
+
+fn loc_link_import<T: pallet::Config>(i: u32, submitter: &T::AccountId) -> LocLinkOf<T> {
+	LocLink {
+		id: T::LocIdFactory::loc_id(i),
+		nature: T::Hasher::hash(&Vec::from([i as u8])),
+		submitter: SupportedAccountId::Polkadot(submitter.clone()),
+		acknowledged_by_owner: false,
+		acknowledged_by_verified_issuer: false,
+	}
 }

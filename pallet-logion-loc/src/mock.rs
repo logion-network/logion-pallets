@@ -130,7 +130,7 @@ impl IsLegalOfficer<<Test as system::Config>::AccountId, RuntimeOrigin> for LoAu
 pub const MAX_LOC_ITEMS: u8 = 3;
 
 parameter_types! {
-	pub const MaxAccountLocs: u32 = 4;
+	pub const MaxAccountLocs: u32 = 100u32;
 	#[derive(Debug, Eq, Clone, PartialEq, TypeInfo)]
 	pub const MaxLocItems: u32 = MAX_LOC_ITEMS as u32;
     pub const MaxCollectionItemFiles: u32 = 2;
