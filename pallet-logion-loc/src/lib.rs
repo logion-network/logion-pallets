@@ -524,6 +524,7 @@ pub struct TokensRecord<Hash, BoundedTokensRecordFilesList, AccountId> {
     description: Hash,
     files: BoundedTokensRecordFilesList,
     submitter: AccountId,
+    imported: bool,
 }
 
 pub type TokensRecordOf<T> = TokensRecord<
@@ -1502,6 +1503,7 @@ pub mod pallet {
                         description,
                         files: bounded_files,
                         submitter: who.clone(),
+                        imported: false,
                     };
                     <TokensRecordsMap<T>>::insert(collection_loc_id, record_id, record);
                 },
@@ -1979,6 +1981,49 @@ pub mod pallet {
             <CollectionSizeMap<T>>::insert(&collection_loc_id, collection_size + 1);
 
             Self::deposit_event(Event::ItemImported(collection_loc_id, item_id));
+            Ok(().into())
+        }
+
+        /// Imports a tokens record
+        #[pallet::call_index(28)]
+        #[pallet::weight(T::WeightInfo::import_tokens_record())]
+        pub fn import_tokens_record(
+            origin: OriginFor<T>,
+            #[pallet::compact] collection_loc_id: T::LocId,
+            record_id: T::TokensRecordId,
+            description: <T as Config>::Hash,
+            files: Vec<crate::TokensRecordFileOf<T>>,
+            submitter: T::AccountId,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+
+            if <crate::pallet::TokensRecordsMap<T>>::contains_key(&collection_loc_id, &record_id) {
+                Err(crate::pallet::Error::<T>::TokensRecordAlreadyExists)?
+            }
+            if files.len() == 0 {
+                Err(crate::pallet::Error::<T>::MustUpload)?
+            } else {
+                let files_hashes: Vec<<T as Config>::Hash> = files.iter()
+                    .map(|file| file.hash)
+                    .collect();
+                if !Self::has_unique_elements(&files_hashes) {
+                    Err(crate::pallet::Error::<T>::DuplicateFile)?
+                }
+            }
+
+            let mut bounded_files: BoundedVec<crate::TokensRecordFileOf<T>, T::MaxTokensRecordFiles> = BoundedVec::with_bounded_capacity(files.len());
+            for file in files.iter() {
+                bounded_files.try_push(file.clone()).map_err(|_| crate::pallet::Error::<T>::TokensRecordTooMuchData)?;
+            }
+
+            let record = crate::TokensRecord {
+                description,
+                files: bounded_files,
+                submitter,
+                imported: true,
+            };
+            <TokensRecordsMap<T>>::insert(collection_loc_id, record_id, record);
+
             Ok(().into())
         }
     }

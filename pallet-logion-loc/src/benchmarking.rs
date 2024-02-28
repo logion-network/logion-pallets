@@ -811,11 +811,6 @@ mod benchmarks {
 	// * Max number of T&C elements
 	#[benchmark]
 	fn import_collection_item() -> Result<(), BenchmarkError> {
-		let legal_officer_id = any_legal_officer::<T>();
-		let requester: T::AccountId = account("requester", 1, SEED);
-		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(requester_identity_loc::<T>()), &legal_officer_id, &requester);
-		ensure_enough_funds::<T>(&requester);
-
 		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
 		let item_id: T::CollectionItemId = T::CollectionItemIdFactory::collection_item_id(0);
 		let item_description = T::Hasher::hash(&Vec::from([0u8]));
@@ -830,6 +825,28 @@ mod benchmarks {
 			None,
 			false,
 			max_item_tcs::<T>(),
+		);
+
+		Ok(())
+	}
+
+	// Benchmark `import_tokens_record` extrinsic with the worst possible conditions:
+	// * Max files
+	#[benchmark]
+	fn import_tokens_record() -> Result<(), BenchmarkError> {
+		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
+		let record_id: T::TokensRecordId = T::TokensRecordIdFactory::tokens_record_id(0);
+		let description = T::Hasher::hash(&Vec::from([0u8]));
+		let requester: T::AccountId = account("requester", 1, SEED);
+
+		#[extrinsic_call]
+		_(
+			RawOrigin::Root,
+			loc_id,
+			record_id,
+			description,
+			max_tokens_record_files::<T>(),
+			requester,
 		);
 
 		Ok(())

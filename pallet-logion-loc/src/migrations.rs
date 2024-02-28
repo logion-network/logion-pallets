@@ -112,6 +112,17 @@ fn add_imported_flag<T: Config>() -> Weight {
         Some(translated)
     });
 
+    TokensRecordsMap::<T>::translate_values(|record: TokensRecordV22Of<T>| {
+        let translated = TokensRecord {
+            description: record.description,
+            files: record.files,
+            submitter: record.submitter,
+            imported: false,
+        };
+        number_translated += 1;
+        Some(translated)
+    });
+
     T::DbWeight::get().reads_writes(number_translated, number_translated)
 }
 
@@ -171,4 +182,20 @@ pub type CollectionItemV22Of<T> = CollectionItemV22<
         TermsAndConditionsElementOf<T>,
         <T as pallet::Config>::MaxCollectionItemTCs
     >,
+>;
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
+pub struct TokensRecordV22<Hash, BoundedTokensRecordFilesList, AccountId> {
+    description: Hash,
+    files: BoundedTokensRecordFilesList,
+    submitter: AccountId,
+}
+
+pub type TokensRecordV22Of<T> = TokensRecordV22<
+    <T as pallet::Config>::Hash,
+    BoundedVec<
+        TokensRecordFileOf<T>,
+        <T as pallet::Config>::MaxTokensRecordFiles
+    >,
+    <T as frame_system::Config>::AccountId,
 >;
