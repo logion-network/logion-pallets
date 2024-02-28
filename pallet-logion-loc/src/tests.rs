@@ -4034,3 +4034,38 @@ fn it_fails_import_must_upload() {
         );
     });
 }
+
+#[test]
+fn it_fails_import_invited_contributor_selection_not_root() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        assert_err!(
+            LogionLoc::import_invited_contributor_selection(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, INVITED_CONTRIBUTOR_ID),
+            BadOrigin,
+        );
+    });
+}
+
+#[test]
+fn it_imports_invited_contributor_selection() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        assert_ok!(LogionLoc::import_invited_contributor_selection(RuntimeOrigin::root(), LOC_ID, INVITED_CONTRIBUTOR_ID));
+        assert_eq!(LogionLoc::selected_invited_contributors(LOC_ID, INVITED_CONTRIBUTOR_ID), Some(()));
+    });
+}
+
+#[test]
+fn it_fails_reimport_invited_contributor_selection() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        assert_ok!(LogionLoc::import_invited_contributor_selection(RuntimeOrigin::root(), LOC_ID, INVITED_CONTRIBUTOR_ID));
+        assert_err!(
+            LogionLoc::import_invited_contributor_selection(RuntimeOrigin::root(), LOC_ID, INVITED_CONTRIBUTOR_ID),
+            Error::<Test>::DuplicateInvitedContributorSelection,
+        );
+    });
+}

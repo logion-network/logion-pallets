@@ -33,6 +33,7 @@ pub trait WeightInfo {
 	fn import_loc() -> Weight;
 	fn import_collection_item() -> Weight;
 	fn import_tokens_record() -> Weight;
+	fn import_invited_contributor_selection() -> Weight;
 }
 
 /// Weights for pallet_logion_loc using the Substrate node and recommended hardware.
@@ -390,6 +391,12 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 			.saturating_add(T::DbWeight::get().writes(2))
 	}
 	fn import_tokens_record() -> Weight {
+		Weight::from_parts(66_251_000, 0)
+			.saturating_add(Weight::from_parts(0, 17978))
+			.saturating_add(T::DbWeight::get().reads(2))
+			.saturating_add(T::DbWeight::get().writes(2))
+	}
+	fn import_invited_contributor_selection() -> Weight {
 		Weight::from_parts(66_251_000, 0)
 			.saturating_add(Weight::from_parts(0, 17978))
 			.saturating_add(T::DbWeight::get().reads(2))

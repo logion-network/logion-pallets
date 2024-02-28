@@ -792,7 +792,7 @@ pub mod pallet {
 		<T as Config>::LocId,
 		Blake2_128Concat,
 		<T as frame_system::Config>::AccountId, // invited contributor
-		()
+        ()
 	>;
 
 	#[pallet::event]
@@ -941,6 +941,8 @@ pub mod pallet {
 		CollectionItemTCsTooMuchData,
 		/// There are too much LOCs linked to account
 		AccountLocsTooMuchData,
+        /// Invited contributor was already selected
+        DuplicateInvitedContributorSelection,
     }
 
     #[pallet::hooks]
@@ -2024,6 +2026,25 @@ pub mod pallet {
             };
             <TokensRecordsMap<T>>::insert(collection_loc_id, record_id, record);
 
+            Ok(().into())
+        }
+
+        /// Imports an invited contributor selection
+        #[pallet::call_index(29)]
+        #[pallet::weight(T::WeightInfo::import_invited_contributor_selection())]
+        pub fn import_invited_contributor_selection(
+            origin: OriginFor<T>,
+            #[pallet::compact] loc_id: T::LocId,
+            invited_contributor: T::AccountId,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+
+            let already_invited_contributor = Self::selected_invited_contributors(loc_id, &invited_contributor);
+            if already_invited_contributor.is_some() {
+                Err(Error::<T>::DuplicateInvitedContributorSelection)?
+            } else {
+                <InvitedContributorsByLocMap<T>>::insert(loc_id, &invited_contributor, ());
+            }
             Ok(().into())
         }
     }

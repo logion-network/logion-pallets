@@ -852,6 +852,22 @@ mod benchmarks {
 		Ok(())
 	}
 
+	// Benchmark `import_invited_contributor_selection` extrinsic.
+	#[benchmark]
+	fn import_invited_contributor_selection() -> Result<(), BenchmarkError> {
+		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
+		let invited_contributor: T::AccountId = account("invited_contributor", 1, SEED);
+
+		#[extrinsic_call]
+		_(
+			RawOrigin::Root,
+			loc_id,
+			invited_contributor.clone(),
+		);
+
+		Ok(())
+	}
+
 	impl_benchmark_test_suite! {
 		LogionLoc,
 		crate::mock::new_test_ext(),
