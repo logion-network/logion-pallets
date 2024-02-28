@@ -1248,6 +1248,7 @@ fn it_adds_item_to_closed_collection_loc() {
             token: None,
             restricted_delivery: false,
             terms_and_conditions: BoundedVec::new(),
+            imported: false,
         }));
         assert_eq!(LogionLoc::collection_size(LOC_ID), Some(1));
     });
@@ -1328,6 +1329,7 @@ fn it_adds_item_with_terms_and_conditions_to_closed_collection_loc() {
             token: None,
             restricted_delivery: false,
             terms_and_conditions: BoundedVec::try_from(terms_and_conditions.clone()).expect("Failed to convert to BoundedVec"),
+            imported: false,
         }));
         assert_eq!(LogionLoc::collection_size(LOC_ID), Some(1));
     });
@@ -3699,6 +3701,176 @@ fn it_imports_open_identity_loc_logion() {
             LocType::Identity,
             false,
             false,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_not_root() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        assert_err!(
+            LogionLoc::import_collection_item(
+                RuntimeOrigin::signed(LOC_REQUESTER_ID),
+                LOC_ID,
+                collection_item_id,
+                collection_item_description.clone(),
+                vec![],
+                None,
+                false,
+                Vec::new()
+            ),
+            BadOrigin,
+        );
+    });
+}
+
+#[test]
+fn it_imports_valid_item() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        assert_ok!(LogionLoc::import_collection_item(
+            RuntimeOrigin::root(),
+            LOC_ID,
+            collection_item_id,
+            collection_item_description.clone(),
+            vec![],
+            None,
+            false,
+            Vec::new()
+        ));
+        assert_eq!(
+            LogionLoc::collection_items(LOC_ID, collection_item_id),
+            Some(CollectionItem {
+                description: collection_item_description,
+                files: BoundedVec::new(),
+                token: None,
+                restricted_delivery: false,
+                terms_and_conditions: BoundedVec::new(),
+                imported: true,
+            }
+        ));
+        assert_eq!(LogionLoc::collection_size(LOC_ID), Some(1));
+    });
+}
+
+#[test]
+fn it_fails_import_item_if_duplicate_key() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        assert_ok!(LogionLoc::import_collection_item(RuntimeOrigin::root(), LOC_ID, collection_item_id.clone(), collection_item_description.clone(), vec![], None, false, Vec::new()));
+        assert_err!(LogionLoc::import_collection_item(RuntimeOrigin::root(), LOC_ID, collection_item_id, collection_item_description, vec![], None, false, Vec::new()), Error::<Test>::CollectionItemAlreadyExists);
+    });
+}
+
+#[test]
+fn it_fails_import_item_with_duplicate_hash() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        let same_hash = BlakeTwo256::hash_of(&"file content".as_bytes().to_vec());
+        let collection_item_files = vec![
+            CollectionItemFile {
+                name: sha256(&"picture.png".as_bytes().to_vec()),
+                content_type: sha256(&"image/png".as_bytes().to_vec()),
+                hash: same_hash,
+                size: 123456,
+            },
+            CollectionItemFile {
+                name: sha256(&"doc.pdf".as_bytes().to_vec()),
+                content_type: sha256(&"application/pdf".as_bytes().to_vec()),
+                hash: same_hash,
+                size: 789,
+            },
+        ];
+        assert_err!(LogionLoc::import_collection_item(RuntimeOrigin::root(), LOC_ID, collection_item_id, collection_item_description, collection_item_files, None, false, Vec::new()), Error::<Test>::DuplicateFile);
+    });
+}
+
+#[test]
+fn it_fails_import_bad_issuance() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        assert_err!(
+            LogionLoc::import_collection_item(
+                RuntimeOrigin::root(),
+                LOC_ID,
+                collection_item_id,
+                collection_item_description.clone(),
+                vec![],
+                Some(CollectionItemToken {
+                    token_issuance: 0,
+                    token_id: sha256(&"some_id".as_bytes().to_vec()),
+                    token_type: sha256(&"some_type".as_bytes().to_vec()),
+                }),
+                false,
+                Vec::new()
+            ),
+            Error::<Test>::BadTokenIssuance,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_missing_token() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        assert_err!(
+            LogionLoc::import_collection_item(
+                RuntimeOrigin::root(),
+                LOC_ID,
+                collection_item_id,
+                collection_item_description.clone(),
+                vec![],
+                None,
+                true,
+                Vec::new()
+            ),
+            Error::<Test>::MissingToken,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_missing_files() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        assert_err!(
+            LogionLoc::import_collection_item(
+                RuntimeOrigin::root(),
+                LOC_ID,
+                collection_item_id,
+                collection_item_description.clone(),
+                vec![],
+                Some(CollectionItemToken {
+                    token_issuance: 1,
+                    token_id: sha256(&"some_id".as_bytes().to_vec()),
+                    token_type: sha256(&"some_type".as_bytes().to_vec()),
+                }),
+                true,
+                Vec::new()
+            ),
+            Error::<Test>::MissingFiles,
         );
     });
 }

@@ -477,6 +477,7 @@ pub struct CollectionItem<Hash, TokenIssuance, BoundedCollectionItemFilesList, B
     token: Option<CollectionItemToken<TokenIssuance, Hash>>,
     restricted_delivery: bool,
     terms_and_conditions: BoundedCollectionItemTCList,
+    imported: bool,
 }
 
 pub type CollectionItemOf<T> = CollectionItem<
@@ -822,6 +823,8 @@ pub mod pallet {
         TokensRecordFeeWithdrawn(T::AccountId, BalanceOf<T>, Beneficiary<T::AccountId>, BalanceOf<T>),
         /// Issued upon LOC import. [locId]
         LocImported(T::LocId),
+        /// Issued upon collection item import. [locId, collectionItemId]
+        ItemImported(T::LocId, T::CollectionItemId),
     }
 
     #[pallet::error]
@@ -1921,6 +1924,63 @@ pub mod pallet {
                 Ok(().into())
             }
 		}
+
+        /// Imports a collection item
+        #[pallet::call_index(27)]
+        #[pallet::weight(T::WeightInfo::import_collection_item())]
+        pub fn import_collection_item(
+            origin: OriginFor<T>,
+            #[pallet::compact] collection_loc_id: T::LocId,
+            item_id: T::CollectionItemId,
+            item_description: <T as Config>::Hash,
+            item_files: Vec<CollectionItemFileOf<T>>,
+            item_token: Option<CollectionItemToken<T::TokenIssuance, <T as Config>::Hash>>,
+            restricted_delivery: bool,
+            terms_and_conditions: Vec<TermsAndConditionsElement<T::LocId, <T as Config>::Hash>>,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+
+            if item_token.is_some() && item_token.as_ref().unwrap().token_issuance < 1_u32.into() {
+                Err(Error::<T>::BadTokenIssuance)?
+            }
+
+            if restricted_delivery && item_token.is_none() {
+                Err(Error::<T>::MissingToken)?
+            }
+
+            if restricted_delivery && item_files.len() == 0 {
+                Err(Error::<T>::MissingFiles)?
+            }
+
+            let files_hashes: Vec<<T as Config>::Hash> = item_files.iter()
+                .map(|file| file.hash)
+                .collect();
+            if !Self::has_unique_elements(&files_hashes) {
+                Err(Error::<T>::DuplicateFile)?
+            }
+
+            let bounded_files: BoundedVec<CollectionItemFileOf<T>, T::MaxCollectionItemFiles> = BoundedVec::try_from(item_files)
+                .map_err(|_| Error::<T>::CollectionItemFilesTooMuchData)?;
+            let bounded_tcs: BoundedVec<TermsAndConditionsElementOf<T>, T::MaxCollectionItemTCs> = BoundedVec::try_from(terms_and_conditions)
+                .map_err(|_| Error::<T>::CollectionItemTCsTooMuchData)?;
+            if <CollectionItemsMap<T>>::contains_key(&collection_loc_id, &item_id) {
+                Err(Error::<T>::CollectionItemAlreadyExists)?
+            }
+            let item = CollectionItem {
+                description: item_description,
+                files: bounded_files,
+                token: item_token.clone(),
+                restricted_delivery,
+                terms_and_conditions: bounded_tcs,
+                imported: true,
+            };
+            <CollectionItemsMap<T>>::insert(collection_loc_id, item_id, item);
+            let collection_size = <CollectionSizeMap<T>>::get(&collection_loc_id).unwrap_or(0);
+            <CollectionSizeMap<T>>::insert(&collection_loc_id, collection_size + 1);
+
+            Self::deposit_event(Event::ItemImported(collection_loc_id, item_id));
+            Ok(().into())
+        }
     }
 
     impl<T: Config> LocQuery<T::LocId, <T as frame_system::Config>::AccountId> for Pallet<T> {
@@ -2240,6 +2300,7 @@ pub mod pallet {
                         token: item_token.clone(),
                         restricted_delivery,
                         terms_and_conditions: bounded_tcs,
+                        imported: false,
                     };
                     <CollectionItemsMap<T>>::insert(collection_loc_id, item_id, item);
                     let collection_size = <CollectionSizeMap<T>>::get(&collection_loc_id).unwrap_or(0);

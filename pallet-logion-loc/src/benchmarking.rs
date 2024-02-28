@@ -297,7 +297,8 @@ mod benchmarks {
 	}
 
 	// Benchmark `add_collection_item` extrinsic with the worst possible conditions:
-	// * LOC has already max files
+	// * Max number of files
+	// * Max number of T&C elements
 	#[benchmark]
 	fn add_collection_item() -> Result<(), BenchmarkError> {
 		let legal_officer_id = any_legal_officer::<T>();
@@ -339,10 +340,10 @@ mod benchmarks {
 			loc_id,
 			item_id,
 			item_description,
-			Vec::new(),
+			max_item_files::<T>(),
 			None,
 			false,
-			Vec::new(),
+			max_item_tcs::<T>(),
 		);
 
 		Ok(())
@@ -805,6 +806,35 @@ mod benchmarks {
 		Ok(())
 	}
 
+	// Benchmark `import_collection_item` extrinsic with the worst possible conditions:
+	// * Max number of files
+	// * Max number of T&C elements
+	#[benchmark]
+	fn import_collection_item() -> Result<(), BenchmarkError> {
+		let legal_officer_id = any_legal_officer::<T>();
+		let requester: T::AccountId = account("requester", 1, SEED);
+		create_closed_polkadot_identity_loc::<T>(T::LocIdFactory::loc_id(requester_identity_loc::<T>()), &legal_officer_id, &requester);
+		ensure_enough_funds::<T>(&requester);
+
+		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
+		let item_id: T::CollectionItemId = T::CollectionItemIdFactory::collection_item_id(0);
+		let item_description = T::Hasher::hash(&Vec::from([0u8]));
+
+		#[extrinsic_call]
+		_(
+			RawOrigin::Root,
+			loc_id,
+			item_id,
+			item_description,
+			max_item_files::<T>(),
+			None,
+			false,
+			max_item_tcs::<T>(),
+		);
+
+		Ok(())
+	}
+
 	impl_benchmark_test_suite! {
 		LogionLoc,
 		crate::mock::new_test_ext(),
@@ -976,6 +1006,33 @@ fn add_many_links<T: pallet::Config>(loc_id: &T::LocId, requester: &T::AccountId
 			loc_link::<T>(i, requester),
 		));
 	}
+}
+
+fn max_item_files<T: pallet::Config>() -> Vec<CollectionItemFileOf<T>> {
+	let mut files = Vec::with_capacity(T::MaxCollectionItemFiles::get().try_into().unwrap());
+	for i in 0..files.capacity() {
+		files.push(CollectionItemFile {
+			name: T::Hasher::hash(&Vec::from([i as u8])),
+			content_type: T::Hasher::hash(&Vec::from([i as u8])),
+			size: 0,
+			hash: T::Hasher::hash(&Vec::from([i as u8])),
+		});
+	}
+	files
+}
+
+fn max_item_tcs<T: pallet::Config>() -> Vec<TermsAndConditionsElementOf<T>> {
+	let mut tcs = Vec::with_capacity(T::MaxCollectionItemTCs::get().try_into().unwrap());
+	let tc_type = T::Hasher::hash(&Vec::from([0]));
+	let tc_loc = T::LocIdFactory::loc_id(0u32);
+	for i in 0..tcs.capacity() {
+		tcs.push(TermsAndConditionsElement {
+			tc_type,
+			tc_loc,
+			details: T::Hasher::hash(&Vec::from([i as u8])),
+		});
+	}
+	tcs
 }
 
 fn max_tokens_record_files<T: pallet::Config>() -> Vec<TokensRecordFileOf<T>> {

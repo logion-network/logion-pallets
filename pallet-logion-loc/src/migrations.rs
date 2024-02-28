@@ -72,6 +72,7 @@ fn clear_storage<T: Config>(pallet_name: &str, storage_name: &str) -> Weight {
 
 fn add_imported_flag<T: Config>() -> Weight {
     let mut number_translated = 0;
+
     LocMap::<T>::translate_values(|loc: LegalOfficerCaseV22Of<T>| {
         let translated = LegalOfficerCase {
             owner: loc.owner,
@@ -92,6 +93,19 @@ fn add_imported_flag<T: Config>() -> Weight {
             legal_fee: loc.value_fee,
             collection_item_fee: loc.collection_item_fee,
             tokens_record_fee: loc.tokens_record_fee,
+            imported: false,
+        };
+        number_translated += 1;
+        Some(translated)
+    });
+
+    CollectionItemsMap::<T>::translate_values(|loc: CollectionItemV22Of<T>| {
+        let translated = CollectionItem {
+            description: loc.description,
+            files: loc.files,
+            token: loc.token,
+            restricted_delivery: loc.restricted_delivery,
+            terms_and_conditions: loc.terms_and_conditions,
             imported: false,
         };
         number_translated += 1;
@@ -135,4 +149,26 @@ pub type LegalOfficerCaseV22Of<T> = LegalOfficerCaseV22<
     <T as pallet::Config>::MaxLocMetadata,
     <T as pallet::Config>::MaxLocFiles,
     <T as pallet::Config>::MaxLocLinks,
+>;
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
+pub struct CollectionItemV22<Hash, TokenIssuance, BoundedCollectionItemFilesList, BoundedCollectionItemTCList> {
+    description: Hash,
+    files: BoundedCollectionItemFilesList,
+    token: Option<CollectionItemToken<TokenIssuance, Hash>>,
+    restricted_delivery: bool,
+    terms_and_conditions: BoundedCollectionItemTCList,
+}
+
+pub type CollectionItemV22Of<T> = CollectionItemV22<
+    <T as pallet::Config>::Hash,
+    <T as pallet::Config>::TokenIssuance,
+    BoundedVec<
+        CollectionItemFileOf<T>,
+        <T as pallet::Config>::MaxCollectionItemFiles
+    >,
+    BoundedVec<
+        TermsAndConditionsElementOf<T>,
+        <T as pallet::Config>::MaxCollectionItemTCs
+    >,
 >;
