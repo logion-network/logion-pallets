@@ -1,8 +1,10 @@
-use crate::{mock::*, LegalOfficerData, Error, LegalOfficerDataOf, HostDataOf, LegalOfficerDataParam, HostDataParam, LegalOfficerDataParamOf};
+use crate::{mock::*, LegalOfficerData, Error, LegalOfficerDataOf, HostDataOf, LegalOfficerDataParam, HostDataParam, LegalOfficerDataParamOf, BoundedPeerId};
 use frame_support::{assert_err, assert_ok};
 use logion_shared::IsLegalOfficer;
 use sp_core::OpaquePeerId;
 use sp_runtime::traits::BadOrigin;
+use frame_support::traits::Len;
+use sp_runtime::BoundedVec;
 
 const LEGAL_OFFICER_ID: u64 = 1;
 const ANOTHER_ID: u64 = 2;
@@ -120,9 +122,12 @@ fn it_lets_host_update() {
         })));
         let data: HostDataOf<Test> = LoAuthorityList::legal_officer_set(LEGAL_OFFICER_ID).unwrap().try_into().unwrap();
         assert_eq!(data.base_url.unwrap(), base_url);
-        assert_eq!(data.node_id.unwrap(), node_id);
+		let bounded_node_id = BoundedPeerId::new(BoundedVec::try_from(node_id.0)
+			.expect("Failed to create expected node_id")
+		);
+        assert_eq!(data.node_id.unwrap(), bounded_node_id);
         assert_eq!(LoAuthorityList::legal_officer_nodes().len(), 1);
-        assert!(LoAuthorityList::legal_officer_nodes().contains(&node_id));
+        assert!(LoAuthorityList::legal_officer_nodes().contains(&bounded_node_id));
     });
 }
 
@@ -139,9 +144,12 @@ fn it_lets_superuser_update() {
         })));
         let data: HostDataOf<Test> = LoAuthorityList::legal_officer_set(LEGAL_OFFICER_ID).unwrap().try_into().unwrap();
         assert_eq!(data.base_url.unwrap(), base_url);
-        assert_eq!(data.node_id.unwrap(), node_id);
+		let bounded_node_id = BoundedPeerId::new(BoundedVec::try_from(node_id.0)
+			.expect("Failed to create expected node_id")
+		);
+        assert_eq!(data.node_id.unwrap(), bounded_node_id);
         assert_eq!(LoAuthorityList::legal_officer_nodes().len(), 1);
-        assert!(LoAuthorityList::legal_officer_nodes().contains(&node_id));
+        assert!(LoAuthorityList::legal_officer_nodes().contains(&bounded_node_id));
     });
 }
 
@@ -184,8 +192,14 @@ fn it_fails_update_if_peer_id_already_in_use() {
             region: Region::Europe,
         })));
         assert_eq!(LoAuthorityList::legal_officer_nodes().len(), 2);
-        assert!(LoAuthorityList::legal_officer_nodes().contains(&node_id1));
-        assert!(LoAuthorityList::legal_officer_nodes().contains(&node_id2));
+		let bounded_node_id1 = BoundedPeerId::new(BoundedVec::try_from(node_id1.clone().0)
+			.expect("Failed to create expected node_id")
+		);
+        assert!(LoAuthorityList::legal_officer_nodes().contains(&bounded_node_id1));
+		let bounded_node_id2 = BoundedPeerId::new(BoundedVec::try_from(node_id2.0)
+			.expect("Failed to create expected node_id")
+		);
+        assert!(LoAuthorityList::legal_officer_nodes().contains(&bounded_node_id2));
 
         assert_err!(LoAuthorityList::update_legal_officer(RuntimeOrigin::root(), LEGAL_OFFICER_ID2, LegalOfficerDataParam::Host(HostDataParam {
             base_url: Option::Some(base_url2.clone()),
@@ -228,7 +242,10 @@ fn it_updates_nodes_on_update() {
         })));
 
         assert_eq!(LoAuthorityList::legal_officer_nodes().len(), 1);
-        assert!(LoAuthorityList::legal_officer_nodes().contains(&node_id2));
+		let bounded_node_id2 = BoundedPeerId::new(BoundedVec::try_from(node_id2.0)
+			.expect("Failed to create expected node_id")
+		);
+        assert!(LoAuthorityList::legal_officer_nodes().contains(&bounded_node_id2));
     });
 }
 

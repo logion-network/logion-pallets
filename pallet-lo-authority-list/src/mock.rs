@@ -3,7 +3,6 @@ use codec::{Encode, Decode, MaxEncodedLen};
 use frame_support::parameter_types;
 use frame_system::{self as system, EnsureRoot};
 use scale_info::TypeInfo;
-use sp_core::ConstU32;
 use sp_core::hash::H256;
 use sp_runtime::{
     traits::{BlakeTwo256, IdentityLookup}, testing::Header, generic,
@@ -90,6 +89,9 @@ impl Default for HostDataParamOf<Test> {
 parameter_types! {
 	#[derive(Debug, Eq, Clone, PartialEq, TypeInfo)]
 	pub const MaxBaseUrlLen: u32 = 30;
+	pub const MaxNodes: u32 = 3;
+	#[derive(Debug, Eq, Clone, PartialEq, TypeInfo, PartialOrd, Ord)]
+	pub const MaxPeerIdLength: u32 = 48;
 }
 
 impl pallet_lo_authority_list::Config for Test {
@@ -100,8 +102,8 @@ impl pallet_lo_authority_list::Config for Test {
     type RuntimeEvent = RuntimeEvent;
 	type WeightInfo = SubstrateWeight<Test>;
 	type MaxBaseUrlLen = MaxBaseUrlLen;
-	type MaxNodes = ConstU32<3>;
-	type MaxPeerIdLength = ConstU32<48>;
+	type MaxNodes = MaxNodes;
+	type MaxPeerIdLength = MaxPeerIdLength;
 }
 
 // Build genesis storage according to the mock runtime.

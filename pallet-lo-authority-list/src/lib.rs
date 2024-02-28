@@ -14,7 +14,7 @@ use codec::{Decode, Encode, MaxEncodedLen};
 
 use frame_support::dispatch::DispatchResultWithPostInfo;
 use sp_runtime::traits::BadOrigin;
-use frame_support::{BoundedVec, ensure, sp_runtime, traits::EnsureOrigin};
+use frame_support::{BoundedVec, sp_runtime, traits::EnsureOrigin};
 
 use logion_shared::{IsLegalOfficer, LegalOfficerCreation};
 use scale_info::{TypeInfo, prelude::string::String};
@@ -43,25 +43,39 @@ pub struct GenesisHostData {
 }
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
-pub enum LegalOfficerData<AccountId, Region, MaxBaseUrlLen: Get<u32>> {
-    Host(HostData<Region, MaxBaseUrlLen>),
+pub enum LegalOfficerData<AccountId, Region, MaxPeerIdLength: Get<u32>, MaxBaseUrlLen: Get<u32>> {
+    Host(HostData<Region, MaxPeerIdLength, MaxBaseUrlLen>),
     Guest(AccountId),
 }
 
 pub type LegalOfficerDataOf<T> = LegalOfficerData<
     <T as frame_system::Config>::AccountId,
     <T as Config>::Region,
+    <T as Config>::MaxPeerIdLength,
     <T as Config>::MaxBaseUrlLen,
 >;
 
-#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
-pub struct HostData<Region, MaxBaseUrlLen: Get<u32>> {
-    pub node_id: Option<PeerId>,
+#[derive(Encode, Decode, Clone, Eq, Ord, PartialEq, PartialOrd, Debug, TypeInfo, MaxEncodedLen)]
+pub struct BoundedPeerId<MaxPeerIdLength: Get<u32>>(pub BoundedVec<u8, MaxPeerIdLength>);
+
+impl<MaxPeerIdLength: Get<u32>> BoundedPeerId<MaxPeerIdLength> {
+	pub fn new(vec: BoundedVec<u8, MaxPeerIdLength>) -> Self {
+		BoundedPeerId(vec)
+	}
+}
+
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
+pub struct HostData<Region, MaxPeerIdLength: Get<u32>, MaxBaseUrlLen: Get<u32>> {
+    pub node_id: Option<BoundedPeerId<MaxPeerIdLength>>,
 	pub base_url: Option<BoundedVec<u8, MaxBaseUrlLen>>,
     pub region: Region,
 }
 
-pub type HostDataOf<T> = HostData<<T as Config>::Region, <T as Config>::MaxBaseUrlLen>;
+pub type HostDataOf<T> = HostData<
+	<T as Config>::Region,
+	<T as Config>::MaxPeerIdLength,
+	<T as Config>::MaxBaseUrlLen,
+>;
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
 pub enum LegalOfficerDataParam<AccountId, Region> {
@@ -123,11 +137,10 @@ pub mod pallet {
 		type MaxNodes: Get<u32>;
 
 		/// The maximum length in bytes of PeerId
-		type MaxPeerIdLength: Get<u32>;
+		type MaxPeerIdLength: Get<u32> + Member + TypeInfo + Ord;
 	}
 
     #[pallet::pallet]
-	#[pallet::without_storage_info]
     pub struct Pallet<T>(_);
 
     /// All LOs indexed by their account ID.
@@ -143,7 +156,7 @@ pub mod pallet {
     /// The set of LO nodes.
     #[pallet::storage]
     #[pallet::getter(fn legal_officer_nodes)]
-    pub type LegalOfficerNodes<T> = StorageValue<_, BoundedBTreeSet<PeerId, <T as pallet::Config>::MaxNodes>, ValueQuery>;
+    pub type LegalOfficerNodes<T> = StorageValue<_, BoundedBTreeSet<BoundedPeerId<<T as pallet::Config>::MaxPeerIdLength>, <T as pallet::Config>::MaxNodes>, ValueQuery>;
 
     #[derive(Encode, Decode, Eq, PartialEq, Debug, TypeInfo, MaxEncodedLen)]
     pub enum StorageVersion {
@@ -151,7 +164,6 @@ pub mod pallet {
         V2AddOnchainSettings,
         V3GuestLegalOfficers,
         V4Region,
-        V5BoundedVec,
     }
 
     impl Default for StorageVersion {
@@ -336,15 +348,26 @@ impl<T: Config> Pallet<T> {
 	{
 		for legal_officer in legal_officers {
 			let region: T::Region = FromStr::from_str(&legal_officer.1.region).unwrap();
-			let base_url = match legal_officer.1.base_url.clone() {
-				Some(url) => Some(BoundedVec::try_from(url).unwrap()),
+			let base_url = match legal_officer.clone().1.base_url.clone() {
+				Some(url) => Some(BoundedVec::try_from(url)
+					.expect("Failed to convert from unbounded url")
+				),
 				None => None,
 			};
-			let llo_data = &LegalOfficerData::Host(HostData {
-				node_id: legal_officer.1.node_id.clone(),
-				base_url,
-				region,
-			}
+			let node_id = match legal_officer.clone().1.node_id {
+				Some(unbounded) => {
+					let bounded = BoundedVec::try_from(unbounded.0)
+						.expect("Failed to convert from unbounded node_id");
+					Some(BoundedPeerId::new(bounded))
+				},
+				None => None,
+			};
+			let llo_data = &LegalOfficerData::Host(
+				HostData {
+					node_id,
+					base_url,
+					region,
+				}
 			);
 			LegalOfficerSet::<T>::insert::<&T::AccountId, &LegalOfficerDataOf<T>>(&(legal_officer.0), llo_data);
 			LegalOfficerNodes::<T>::set(BoundedBTreeSet::new());
@@ -359,7 +382,7 @@ impl<T: Config> Pallet<T> {
     }
 
     fn reset_legal_officer_nodes() -> Result<(), Error<T>> {
-        let mut new_nodes: BoundedBTreeSet<PeerId, <T as pallet::Config>::MaxNodes> = BoundedBTreeSet::new();
+        let mut new_nodes: BoundedBTreeSet<BoundedPeerId<<T as pallet::Config>::MaxPeerIdLength>, <T as pallet::Config>::MaxNodes> = BoundedBTreeSet::new();
         for data in LegalOfficerSet::<T>::iter_values() {
             match data {
                 LegalOfficerData::Host(host_data) => {
@@ -449,14 +472,17 @@ impl<T: Config> Pallet<T> {
 					},
 					None => None,
 				};
-				ensure!(
-					host_data.node_id.is_none() ||
-					host_data.node_id.as_ref().unwrap().0.len() <= T::MaxPeerIdLength::get() as usize,
-					Error::<T>::PeerIdTooLong
-				);
+				let node_id = match host_data.node_id.clone() {
+					Some(peer_id) => {
+						let bounded_node_id = BoundedVec::try_from(peer_id.0)
+							.map_err(|_| Error::<T>::PeerIdTooLong)?;
+						Some(BoundedPeerId::new(bounded_node_id))
+					}
+					None => None,
+				};
 				LegalOfficerData::Host(
 					HostData {
-						node_id: host_data.node_id.clone(),
+						node_id,
 						base_url,
 						region: host_data.region,
 					}
