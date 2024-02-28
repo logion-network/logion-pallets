@@ -1826,7 +1826,7 @@ fn it_nominates_an_issuer() {
         setup_default_balances();
         nominate_issuer(ISSUER_ID1, ISSUER1_IDENTITY_LOC_ID);
 
-        assert_eq!(LogionLoc::verified_issuers(legal_officer_id(1), ISSUER_ID1), Some(VerifiedIssuer { identity_loc: ISSUER1_IDENTITY_LOC_ID }));
+        assert_eq!(LogionLoc::verified_issuers(legal_officer_id(1), ISSUER_ID1), Some(VerifiedIssuer { identity_loc: ISSUER1_IDENTITY_LOC_ID, imported: false }));
     });
 }
 
@@ -4066,6 +4066,72 @@ fn it_fails_reimport_invited_contributor_selection() {
         assert_err!(
             LogionLoc::import_invited_contributor_selection(RuntimeOrigin::root(), LOC_ID, INVITED_CONTRIBUTOR_ID),
             Error::<Test>::DuplicateInvitedContributorSelection,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_an_issuer_not_root() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let legal_officer = legal_officer_id(1);
+
+        assert_err!(
+            LogionLoc::import_verified_issuer(
+                RuntimeOrigin::signed(legal_officer),
+                legal_officer,
+                ISSUER_ID1,
+                ISSUER1_IDENTITY_LOC_ID,
+            ),
+            BadOrigin,
+        );
+    });
+}
+
+#[test]
+fn it_imports_an_issuer() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let legal_officer = legal_officer_id(1);
+
+        assert_ok!(LogionLoc::import_verified_issuer(
+            RuntimeOrigin::root(),
+            legal_officer,
+            ISSUER_ID1,
+            ISSUER1_IDENTITY_LOC_ID,
+        ));
+
+        assert_eq!(
+            LogionLoc::verified_issuers(legal_officer, ISSUER_ID1),
+            Some(VerifiedIssuer {
+                identity_loc: ISSUER1_IDENTITY_LOC_ID,
+                imported: true,
+            }),
+        );
+    });
+}
+
+#[test]
+fn it_fails_imports_an_issuer_twice() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let legal_officer = legal_officer_id(1);
+
+        assert_ok!(LogionLoc::import_verified_issuer(
+            RuntimeOrigin::root(),
+            legal_officer,
+            ISSUER_ID1,
+            ISSUER1_IDENTITY_LOC_ID,
+        ));
+
+        assert_err!(
+            LogionLoc::import_verified_issuer(
+                RuntimeOrigin::root(),
+                legal_officer,
+                ISSUER_ID1,
+                ISSUER1_IDENTITY_LOC_ID,
+            ),
+            Error::<Test>::AlreadyNominated,
         );
     });
 }

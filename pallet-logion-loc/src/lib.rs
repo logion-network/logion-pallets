@@ -513,6 +513,7 @@ pub struct CollectionItemToken<TokenIssuance, Hash> {
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct VerifiedIssuer<LocId> {
     identity_loc: LocId,
+    imported: bool,
 }
 
 pub type VerifiedIssuerOf<T> = VerifiedIssuer<
@@ -1380,7 +1381,8 @@ pub mod pallet {
                     Err(Error::<T>::AlreadyNominated)?
                 }
                 <VerifiedIssuersMap<T>>::insert(&who, &issuer, VerifiedIssuer {
-                    identity_loc: identity_loc_id
+                    identity_loc: identity_loc_id,
+                    imported: false,
                 });
                 Ok(().into())
             }
@@ -2045,6 +2047,28 @@ pub mod pallet {
             } else {
                 <InvitedContributorsByLocMap<T>>::insert(loc_id, &invited_contributor, ());
             }
+            Ok(().into())
+        }
+
+        /// Import a verified issuer
+        #[pallet::call_index(30)]
+        #[pallet::weight(T::WeightInfo::import_verified_issuer())]
+        pub fn import_verified_issuer(
+            origin: OriginFor<T>,
+            legal_officer: T::AccountId,
+            issuer: T::AccountId,
+            #[pallet::compact] identity_loc_id: T::LocId,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+
+            let existing_issuer = Self::verified_issuers(&legal_officer, &issuer);
+            if existing_issuer.is_some() {
+                Err(Error::<T>::AlreadyNominated)?
+            }
+            <VerifiedIssuersMap<T>>::insert(&legal_officer, &issuer, VerifiedIssuer {
+                identity_loc: identity_loc_id,
+                imported: true,
+            });
             Ok(().into())
         }
     }

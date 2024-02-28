@@ -123,6 +123,15 @@ fn add_imported_flag<T: Config>() -> Weight {
         Some(translated)
     });
 
+    VerifiedIssuersMap::<T>::translate_values(|issuer: VerifiedIssuerV22Of<T>| {
+        let translated = VerifiedIssuer {
+            identity_loc: issuer.identity_loc,
+            imported: false,
+        };
+        number_translated += 1;
+        Some(translated)
+    });
+
     T::DbWeight::get().reads_writes(number_translated, number_translated)
 }
 
@@ -198,4 +207,13 @@ pub type TokensRecordV22Of<T> = TokensRecordV22<
         <T as pallet::Config>::MaxTokensRecordFiles
     >,
     <T as frame_system::Config>::AccountId,
+>;
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
+pub struct VerifiedIssuerV22<LocId> {
+    identity_loc: LocId,
+}
+
+pub type VerifiedIssuerV22Of<T> = VerifiedIssuerV22<
+    <T as pallet::Config>::LocId,
 >;
