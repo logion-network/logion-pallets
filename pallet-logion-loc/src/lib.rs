@@ -559,6 +559,7 @@ pub struct Sponsorship<AccountId, EthereumAddress, LocId> {
     sponsored_account: SupportedAccountId<AccountId, EthereumAddress>,
     legal_officer: AccountId,
     loc_id: Option<LocId>,
+    imported: bool,
 }
 
 pub type SponsorshipOf<T> = Sponsorship<
@@ -827,6 +828,10 @@ pub mod pallet {
         LocImported(T::LocId),
         /// Issued upon collection item import. [locId, collectionItemId]
         ItemImported(T::LocId, T::CollectionItemId),
+        /// Issued upon tokens record import. [locId, recordId]
+        TokensRecordImported(T::LocId, T::TokensRecordId),
+        /// Issued upon sponsorship import. [sponsorshipId]
+        SponsorshipImported(T::SponsorshipId)
     }
 
     #[pallet::error]
@@ -1564,6 +1569,7 @@ pub mod pallet {
                     sponsored_account: sponsored_account.clone(),
                     legal_officer,
                     loc_id: None,
+                    imported: false,
                 };
                 <SponsorshipMap<T>>::insert(sponsorship_id, sponsorship);
 
@@ -2026,6 +2032,7 @@ pub mod pallet {
             };
             <TokensRecordsMap<T>>::insert(collection_loc_id, record_id, record);
 
+            Self::deposit_event(Event::TokensRecordImported(collection_loc_id, record_id));
             Ok(().into())
         }
 
@@ -2090,6 +2097,36 @@ pub mod pallet {
                 <LocsByVerifiedIssuerMap<T>>::insert((&issuer, loc_owner, loc_id), ());
             }
             Ok(().into())
+        }
+
+        /// Import a sponsorship.
+        #[pallet::call_index(32)]
+        #[pallet::weight(T::WeightInfo::import_sponsorship())]
+        pub fn import_sponsorship(
+            origin: OriginFor<T>,
+            #[pallet::compact] sponsorship_id: T::SponsorshipId,
+            sponsor: T::AccountId,
+            sponsored_account: SupportedAccountId<T::AccountId, T::EthereumAddress>,
+            legal_officer: T::AccountId,
+            loc_id: Option<T::LocId>,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+
+            if <SponsorshipMap<T>>::contains_key(&sponsorship_id) {
+                Err(Error::<T>::AlreadyExists)?
+            } else {
+                let sponsorship = Sponsorship {
+                    sponsor: sponsor.clone(),
+                    sponsored_account: sponsored_account.clone(),
+                    legal_officer,
+                    loc_id,
+                    imported: true,
+                };
+                <SponsorshipMap<T>>::insert(sponsorship_id, sponsorship);
+
+                Self::deposit_event(Event::SponsorshipImported(sponsorship_id));
+                Ok(().into())
+            }
         }
     }
 

@@ -132,6 +132,18 @@ fn add_imported_flag<T: Config>() -> Weight {
         Some(translated)
     });
 
+    SponsorshipMap::<T>::translate_values(|sponsorship: SponsorshipV22Of<T>| {
+        let translated = Sponsorship {
+            sponsor: sponsorship.sponsor,
+            sponsored_account: sponsorship.sponsored_account,
+            legal_officer: sponsorship.legal_officer,
+            loc_id: sponsorship.loc_id,
+            imported: false,
+        };
+        number_translated += 1;
+        Some(translated)
+    });
+
     T::DbWeight::get().reads_writes(number_translated, number_translated)
 }
 
@@ -216,4 +228,18 @@ pub struct VerifiedIssuerV22<LocId> {
 
 pub type VerifiedIssuerV22Of<T> = VerifiedIssuerV22<
     <T as pallet::Config>::LocId,
+>;
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
+pub struct SponsorshipV22<AccountId, EthereumAddress, LocId> {
+    sponsor: AccountId,
+    sponsored_account: SupportedAccountId<AccountId, EthereumAddress>,
+    legal_officer: AccountId,
+    loc_id: Option<LocId>,
+}
+
+pub type SponsorshipV22Of<T> = SponsorshipV22<
+    <T as frame_system::Config>::AccountId,
+    <T as Config>::EthereumAddress,
+    <T as Config>::LocId,
 >;

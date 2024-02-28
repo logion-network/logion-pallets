@@ -904,6 +904,27 @@ mod benchmarks {
 		Ok(())
 	}
 
+	// Benchmark `import_sponsorship` extrinsic.
+	#[benchmark]
+	fn import_sponsorship() -> Result<(), BenchmarkError> {
+		let legal_officer_id = any_legal_officer::<T>();
+		let requester = OtherAccountId::Ethereum(T::EthereumAddressFactory::address(0));
+		let sponsorship_id = T::SponsorshipIdFactory::sponsorship_id(0);
+		let loc_id = Some(T::LocIdFactory::loc_id(0));
+
+		#[extrinsic_call]
+		_(
+			RawOrigin::Root,
+			sponsorship_id,
+			legal_officer_id.clone(),
+			SupportedAccountId::Other(requester),
+			legal_officer_id,
+			loc_id,
+		);
+
+		Ok(())
+	}
+
 	impl_benchmark_test_suite! {
 		LogionLoc,
 		crate::mock::new_test_ext(),

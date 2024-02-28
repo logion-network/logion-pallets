@@ -11,7 +11,7 @@ use sp_runtime::traits::Hash;
 
 use logion_shared::{Beneficiary, LocQuery, LocValidity};
 
-use crate::{CollectionItem, CollectionItemFile, CollectionItemToken, Config, Error, fees::*, File, FileParams, Hasher, Items, ItemsOf, ItemsParams, ItemsParamsOf, LegalOfficerCase, LocLink, LocLinkParams, LocType, LocVoidInfo, MetadataItem, MetadataItemParams, mock::*, OtherAccountId, Requester::{Account, OtherAccount}, Requester, RequesterOf, SupportedAccountId, TermsAndConditionsElement, TermsAndConditionsElementOf, TokensRecord, TokensRecordFile, TokensRecordFileOf, VerifiedIssuer};
+use crate::{CollectionItem, CollectionItemFile, CollectionItemToken, Config, Error, fees::*, File, FileParams, Hasher, Items, ItemsOf, ItemsParams, ItemsParamsOf, LegalOfficerCase, LocLink, LocLinkParams, LocType, LocVoidInfo, MetadataItem, MetadataItemParams, mock::*, OtherAccountId, Requester::{Account, OtherAccount}, Requester, RequesterOf, Sponsorship, SupportedAccountId, TermsAndConditionsElement, TermsAndConditionsElementOf, TokensRecord, TokensRecordFile, TokensRecordFileOf, VerifiedIssuer};
 
 const LOC_ID: u32 = 0;
 const OTHER_LOC_ID: u32 = 1;
@@ -4190,6 +4190,95 @@ fn it_fails_importing_an_issuer_selection_twice() {
                 LOC_ID,
                 ISSUER_ID1,
                 legal_officer,
+            ),
+            Error::<Test>::AlreadyExists,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_sponsorship_not_root() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let sponsorship_id = 1;
+        let beneficiary = H160::from_str("0x900edc98db53508e6742723988b872dd08cd09c2").unwrap();
+        let sponsored_account = SupportedAccountId::Other(OtherAccountId::Ethereum(beneficiary));
+        let legal_officer = legal_officer_id(1);
+        let loc_id = Some(LOC_ID);
+
+        assert_err!(
+            LogionLoc::import_sponsorship(
+                RuntimeOrigin::signed(legal_officer),
+                sponsorship_id,
+                SPONSOR_ID,
+                sponsored_account,
+                legal_officer,
+                loc_id,
+            ),
+            BadOrigin,
+        );
+    });
+}
+
+#[test]
+fn it_imports_sponsorship() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let sponsorship_id = 1;
+        let beneficiary = H160::from_str("0x900edc98db53508e6742723988b872dd08cd09c2").unwrap();
+        let sponsored_account = SupportedAccountId::Other(OtherAccountId::Ethereum(beneficiary));
+        let legal_officer = legal_officer_id(1);
+        let loc_id = Some(LOC_ID);
+
+        assert_ok!(LogionLoc::import_sponsorship(
+            RuntimeOrigin::root(),
+            sponsorship_id,
+            SPONSOR_ID,
+            sponsored_account,
+            legal_officer,
+            loc_id,
+        ));
+
+        assert_eq!(
+            LogionLoc::sponsorship(sponsorship_id),
+            Some(Sponsorship {
+                sponsor: SPONSOR_ID,
+                sponsored_account,
+                legal_officer,
+                loc_id,
+                imported: true,
+            }),
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_sponsorship_twice() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let sponsorship_id = 1;
+        let beneficiary = H160::from_str("0x900edc98db53508e6742723988b872dd08cd09c2").unwrap();
+        let sponsored_account = SupportedAccountId::Other(OtherAccountId::Ethereum(beneficiary));
+        let legal_officer = legal_officer_id(1);
+        let loc_id = Some(LOC_ID);
+
+        assert_ok!(LogionLoc::import_sponsorship(
+            RuntimeOrigin::root(),
+            sponsorship_id,
+            SPONSOR_ID,
+            sponsored_account,
+            legal_officer,
+            loc_id,
+        ));
+
+        assert_err!(
+            LogionLoc::import_sponsorship(
+                RuntimeOrigin::root(),
+                sponsorship_id,
+                SPONSOR_ID,
+                sponsored_account,
+                legal_officer,
+                loc_id,
             ),
             Error::<Test>::AlreadyExists,
         );
