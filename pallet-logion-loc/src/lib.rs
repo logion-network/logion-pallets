@@ -942,8 +942,6 @@ pub mod pallet {
 		CollectionItemTCsTooMuchData,
 		/// There are too much LOCs linked to account
 		AccountLocsTooMuchData,
-        /// Invited contributor was already selected
-        DuplicateInvitedContributorSelection,
     }
 
     #[pallet::hooks]
@@ -2043,7 +2041,7 @@ pub mod pallet {
 
             let already_invited_contributor = Self::selected_invited_contributors(loc_id, &invited_contributor);
             if already_invited_contributor.is_some() {
-                Err(Error::<T>::DuplicateInvitedContributorSelection)?
+                Err(Error::<T>::AlreadyExists)?
             } else {
                 <InvitedContributorsByLocMap<T>>::insert(loc_id, &invited_contributor, ());
             }
@@ -2063,12 +2061,34 @@ pub mod pallet {
 
             let existing_issuer = Self::verified_issuers(&legal_officer, &issuer);
             if existing_issuer.is_some() {
-                Err(Error::<T>::AlreadyNominated)?
+                Err(Error::<T>::AlreadyExists)?
+            } else {
+                <VerifiedIssuersMap<T>>::insert(&legal_officer, &issuer, VerifiedIssuer {
+                    identity_loc: identity_loc_id,
+                    imported: true,
+                });
             }
-            <VerifiedIssuersMap<T>>::insert(&legal_officer, &issuer, VerifiedIssuer {
-                identity_loc: identity_loc_id,
-                imported: true,
-            });
+            Ok(().into())
+        }
+
+        /// Import a verified issuer selection
+        #[pallet::call_index(31)]
+        #[pallet::weight(T::WeightInfo::import_verified_issuer_selection())]
+        pub fn import_verified_issuer_selection(
+            origin: OriginFor<T>,
+            #[pallet::compact] loc_id: T::LocId,
+            issuer: T::AccountId,
+            loc_owner: T::AccountId,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+
+            let already_issuer = Self::selected_verified_issuers(loc_id, &issuer);
+            if already_issuer.is_some() {
+                Err(Error::<T>::AlreadyExists)?
+            } else {
+                <VerifiedIssuersByLocMap<T>>::insert(loc_id, &issuer, ());
+                <LocsByVerifiedIssuerMap<T>>::insert((&issuer, loc_owner, loc_id), ());
+            }
             Ok(().into())
         }
     }

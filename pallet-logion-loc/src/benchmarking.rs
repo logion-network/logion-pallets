@@ -886,6 +886,24 @@ mod benchmarks {
 		Ok(())
 	}
 
+	// Benchmark `import_verified_issuer_selection` extrinsic.
+	#[benchmark]
+	fn import_verified_issuer_selection() -> Result<(), BenchmarkError> {
+		let loc_id: T::LocId = T::LocIdFactory::loc_id(0);
+		let issuer: T::AccountId = account("issuer", 1, SEED);
+		let legal_officer_id = any_legal_officer::<T>();
+
+		#[extrinsic_call]
+		_(
+			RawOrigin::Root,
+			loc_id,
+			issuer,
+			legal_officer_id,
+		);
+
+		Ok(())
+	}
+
 	impl_benchmark_test_suite! {
 		LogionLoc,
 		crate::mock::new_test_ext(),
