@@ -18,58 +18,72 @@ pub trait WeightInfo {
 pub struct SubstrateWeight<T>(PhantomData<T>);
 
 impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
-	/// Storage: `LoAuthorityList::LegalOfficerSet` (r:54 w:1)
-	/// Proof: `LoAuthorityList::LegalOfficerSet` (`max_values`: None, `max_size`: None, mode: `Measured`)
+	/// Storage: `LoAuthorityList::LegalOfficerSet` (r:101 w:1)
+	/// Proof: `LoAuthorityList::LegalOfficerSet` (`max_values`: None, `max_size`: Some(2185), added: 4660, mode: `MaxEncodedLen`)
 	/// Storage: `LoAuthorityList::LegalOfficerNodes` (r:0 w:1)
-	/// Proof: `LoAuthorityList::LegalOfficerNodes` (`max_values`: Some(1), `max_size`: None, mode: `Measured`)
+	/// Proof: `LoAuthorityList::LegalOfficerNodes` (`max_values`: Some(1), `max_size`: Some(13002), added: 13497, mode: `MaxEncodedLen`)
 	fn add_legal_officer() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `4910`
-		//  Estimated: `139550`
-		// Minimum execution time: 243_589_000 picoseconds.
-		Weight::from_parts(258_521_000, 0)
-			.saturating_add(Weight::from_parts(0, 139550))
-			.saturating_add(T::DbWeight::get().reads(54))
+		//  Measured:  `9309`
+		//  Estimated: `471650`
+		// Minimum execution time: 418_485_000 picoseconds.
+		Weight::from_parts(426_943_000, 0)
+			.saturating_add(Weight::from_parts(0, 471650))
+			.saturating_add(T::DbWeight::get().reads(101))
 			.saturating_add(T::DbWeight::get().writes(2))
 	}
-	/// Storage: `LoAuthorityList::LegalOfficerSet` (r:53 w:1)
-	/// Proof: `LoAuthorityList::LegalOfficerSet` (`max_values`: None, `max_size`: None, mode: `Measured`)
+	/// Storage: `LoAuthorityList::LegalOfficerSet` (r:101 w:1)
+	/// Proof: `LoAuthorityList::LegalOfficerSet` (`max_values`: None, `max_size`: Some(2185), added: 4660, mode: `MaxEncodedLen`)
 	/// Storage: `LoAuthorityList::LegalOfficerNodes` (r:0 w:1)
-	/// Proof: `LoAuthorityList::LegalOfficerNodes` (`max_values`: Some(1), `max_size`: None, mode: `Measured`)
+	/// Proof: `LoAuthorityList::LegalOfficerNodes` (`max_values`: Some(1), `max_size`: Some(13002), added: 13497, mode: `MaxEncodedLen`)
 	fn remove_legal_officer() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `4910`
-		//  Estimated: `137075`
-		// Minimum execution time: 353_828_000 picoseconds.
-		Weight::from_parts(364_906_000, 0)
-			.saturating_add(Weight::from_parts(0, 137075))
-			.saturating_add(T::DbWeight::get().reads(53))
+		//  Measured:  `9400`
+		//  Estimated: `471650`
+		// Minimum execution time: 598_565_000 picoseconds.
+		Weight::from_parts(621_236_000, 0)
+			.saturating_add(Weight::from_parts(0, 471650))
+			.saturating_add(T::DbWeight::get().reads(101))
 			.saturating_add(T::DbWeight::get().writes(2))
 	}
-	/// Storage: `LoAuthorityList::LegalOfficerSet` (r:53 w:1)
-	/// Proof: `LoAuthorityList::LegalOfficerSet` (`max_values`: None, `max_size`: None, mode: `Measured`)
+	/// Storage: `LoAuthorityList::LegalOfficerSet` (r:101 w:1)
+	/// Proof: `LoAuthorityList::LegalOfficerSet` (`max_values`: None, `max_size`: Some(2185), added: 4660, mode: `MaxEncodedLen`)
 	/// Storage: `LoAuthorityList::LegalOfficerNodes` (r:0 w:1)
-	/// Proof: `LoAuthorityList::LegalOfficerNodes` (`max_values`: Some(1), `max_size`: None, mode: `Measured`)
+	/// Proof: `LoAuthorityList::LegalOfficerNodes` (`max_values`: Some(1), `max_size`: Some(13002), added: 13497, mode: `MaxEncodedLen`)
 	fn update_legal_officer() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `4910`
-		//  Estimated: `137075`
-		// Minimum execution time: 244_677_000 picoseconds.
-		Weight::from_parts(253_044_000, 0)
-			.saturating_add(Weight::from_parts(0, 137075))
-			.saturating_add(T::DbWeight::get().reads(53))
+		//  Measured:  `9400`
+		//  Estimated: `471650`
+		// Minimum execution time: 410_435_000 picoseconds.
+		Weight::from_parts(427_006_000, 0)
+			.saturating_add(Weight::from_parts(0, 471650))
+			.saturating_add(T::DbWeight::get().reads(101))
 			.saturating_add(T::DbWeight::get().writes(2))
 	}
+	/// Storage: `LoAuthorityList::LegalOfficerSet` (r:101 w:1)
+	/// Proof: `LoAuthorityList::LegalOfficerSet` (`max_values`: None, `max_size`: Some(2185), added: 4660, mode: `MaxEncodedLen`)
+	/// Storage: `LoAuthorityList::LegalOfficerNodes` (r:0 w:1)
+	/// Proof: `LoAuthorityList::LegalOfficerNodes` (`max_values`: Some(1), `max_size`: Some(13002), added: 13497, mode: `MaxEncodedLen`)
 	fn import_host_legal_officer() -> Weight {
-		Weight::from_parts(253_044_000, 0)
-			.saturating_add(Weight::from_parts(0, 137075))
-			.saturating_add(T::DbWeight::get().reads(53))
+		// Proof Size summary in bytes:
+		//  Measured:  `9309`
+		//  Estimated: `471650`
+		// Minimum execution time: 406_380_000 picoseconds.
+		Weight::from_parts(432_396_000, 0)
+			.saturating_add(Weight::from_parts(0, 471650))
+			.saturating_add(T::DbWeight::get().reads(101))
 			.saturating_add(T::DbWeight::get().writes(2))
 	}
+	/// Storage: `LoAuthorityList::LegalOfficerSet` (r:2 w:1)
+	/// Proof: `LoAuthorityList::LegalOfficerSet` (`max_values`: None, `max_size`: Some(2185), added: 4660, mode: `MaxEncodedLen`)
 	fn import_guest_legal_officer() -> Weight {
-		Weight::from_parts(253_044_000, 0)
-			.saturating_add(Weight::from_parts(0, 137075))
-			.saturating_add(T::DbWeight::get().reads(53))
-			.saturating_add(T::DbWeight::get().writes(2))
+		// Proof Size summary in bytes:
+		//  Measured:  `878`
+		//  Estimated: `10310`
+		// Minimum execution time: 23_398_000 picoseconds.
+		Weight::from_parts(27_347_000, 0)
+			.saturating_add(Weight::from_parts(0, 10310))
+			.saturating_add(T::DbWeight::get().reads(2))
+			.saturating_add(T::DbWeight::get().writes(1))
 	}
 }
