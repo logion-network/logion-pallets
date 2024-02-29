@@ -11,7 +11,7 @@ use sp_runtime::traits::Hash;
 
 use logion_shared::{Beneficiary, LocQuery, LocValidity};
 
-use crate::{CollectionItem, CollectionItemFile, CollectionItemToken, Config, Error, fees::*, File, FileParams, Hasher, Items, ItemsOf, ItemsParams, ItemsParamsOf, LegalOfficerCase, LocLink, LocLinkParams, LocType, LocVoidInfo, MetadataItem, MetadataItemParams, mock::*, OtherAccountId, Requester::{Account, OtherAccount}, Requester, RequesterOf, SupportedAccountId, TermsAndConditionsElement, TermsAndConditionsElementOf, TokensRecordFile, TokensRecordFileOf, VerifiedIssuer};
+use crate::{CollectionItem, CollectionItemFile, CollectionItemToken, Config, Error, fees::*, File, FileParams, Hasher, Items, ItemsOf, ItemsParams, ItemsParamsOf, LegalOfficerCase, LocLink, LocLinkParams, LocType, LocVoidInfo, MetadataItem, MetadataItemParams, mock::*, OtherAccountId, Requester::{Account, OtherAccount}, Requester, RequesterOf, Sponsorship, SupportedAccountId, TermsAndConditionsElement, TermsAndConditionsElementOf, TokensRecord, TokensRecordFile, TokensRecordFileOf, VerifiedIssuer};
 
 const LOC_ID: u32 = 0;
 const OTHER_LOC_ID: u32 = 1;
@@ -1248,6 +1248,7 @@ fn it_adds_item_to_closed_collection_loc() {
             token: None,
             restricted_delivery: false,
             terms_and_conditions: BoundedVec::new(),
+            imported: false,
         }));
         assert_eq!(LogionLoc::collection_size(LOC_ID), Some(1));
     });
@@ -1328,6 +1329,7 @@ fn it_adds_item_with_terms_and_conditions_to_closed_collection_loc() {
             token: None,
             restricted_delivery: false,
             terms_and_conditions: BoundedVec::try_from(terms_and_conditions.clone()).expect("Failed to convert to BoundedVec"),
+            imported: false,
         }));
         assert_eq!(LogionLoc::collection_size(LOC_ID), Some(1));
     });
@@ -1824,7 +1826,7 @@ fn it_nominates_an_issuer() {
         setup_default_balances();
         nominate_issuer(ISSUER_ID1, ISSUER1_IDENTITY_LOC_ID);
 
-        assert_eq!(LogionLoc::verified_issuers(legal_officer_id(1), ISSUER_ID1), Some(VerifiedIssuer { identity_loc: ISSUER1_IDENTITY_LOC_ID }));
+        assert_eq!(LogionLoc::verified_issuers(legal_officer_id(1), ISSUER_ID1), Some(VerifiedIssuer { identity_loc: ISSUER1_IDENTITY_LOC_ID, imported: false }));
     });
 }
 
@@ -3699,6 +3701,586 @@ fn it_imports_open_identity_loc_logion() {
             LocType::Identity,
             false,
             false,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_item_not_root() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        assert_err!(
+            LogionLoc::import_collection_item(
+                RuntimeOrigin::signed(LOC_REQUESTER_ID),
+                LOC_ID,
+                collection_item_id,
+                collection_item_description.clone(),
+                vec![],
+                None,
+                false,
+                Vec::new()
+            ),
+            BadOrigin,
+        );
+    });
+}
+
+#[test]
+fn it_imports_valid_item() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        assert_ok!(LogionLoc::import_collection_item(
+            RuntimeOrigin::root(),
+            LOC_ID,
+            collection_item_id,
+            collection_item_description.clone(),
+            vec![],
+            None,
+            false,
+            Vec::new()
+        ));
+        assert_eq!(
+            LogionLoc::collection_items(LOC_ID, collection_item_id),
+            Some(CollectionItem {
+                description: collection_item_description,
+                files: BoundedVec::new(),
+                token: None,
+                restricted_delivery: false,
+                terms_and_conditions: BoundedVec::new(),
+                imported: true,
+            }
+        ));
+        assert_eq!(LogionLoc::collection_size(LOC_ID), Some(1));
+    });
+}
+
+#[test]
+fn it_fails_import_item_if_duplicate_key() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        assert_ok!(LogionLoc::import_collection_item(RuntimeOrigin::root(), LOC_ID, collection_item_id.clone(), collection_item_description.clone(), vec![], None, false, Vec::new()));
+        assert_err!(LogionLoc::import_collection_item(RuntimeOrigin::root(), LOC_ID, collection_item_id, collection_item_description, vec![], None, false, Vec::new()), Error::<Test>::CollectionItemAlreadyExists);
+    });
+}
+
+#[test]
+fn it_fails_import_item_with_duplicate_hash() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        let same_hash = BlakeTwo256::hash_of(&"file content".as_bytes().to_vec());
+        let collection_item_files = vec![
+            CollectionItemFile {
+                name: sha256(&"picture.png".as_bytes().to_vec()),
+                content_type: sha256(&"image/png".as_bytes().to_vec()),
+                hash: same_hash,
+                size: 123456,
+            },
+            CollectionItemFile {
+                name: sha256(&"doc.pdf".as_bytes().to_vec()),
+                content_type: sha256(&"application/pdf".as_bytes().to_vec()),
+                hash: same_hash,
+                size: 789,
+            },
+        ];
+        assert_err!(LogionLoc::import_collection_item(RuntimeOrigin::root(), LOC_ID, collection_item_id, collection_item_description, collection_item_files, None, false, Vec::new()), Error::<Test>::DuplicateFile);
+    });
+}
+
+#[test]
+fn it_fails_import_bad_issuance() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        assert_err!(
+            LogionLoc::import_collection_item(
+                RuntimeOrigin::root(),
+                LOC_ID,
+                collection_item_id,
+                collection_item_description.clone(),
+                vec![],
+                Some(CollectionItemToken {
+                    token_issuance: 0,
+                    token_id: sha256(&"some_id".as_bytes().to_vec()),
+                    token_type: sha256(&"some_type".as_bytes().to_vec()),
+                }),
+                false,
+                Vec::new()
+            ),
+            Error::<Test>::BadTokenIssuance,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_missing_token() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        assert_err!(
+            LogionLoc::import_collection_item(
+                RuntimeOrigin::root(),
+                LOC_ID,
+                collection_item_id,
+                collection_item_description.clone(),
+                vec![],
+                None,
+                true,
+                Vec::new()
+            ),
+            Error::<Test>::MissingToken,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_missing_files() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
+        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
+        assert_err!(
+            LogionLoc::import_collection_item(
+                RuntimeOrigin::root(),
+                LOC_ID,
+                collection_item_id,
+                collection_item_description.clone(),
+                vec![],
+                Some(CollectionItemToken {
+                    token_issuance: 1,
+                    token_id: sha256(&"some_id".as_bytes().to_vec()),
+                    token_type: sha256(&"some_type".as_bytes().to_vec()),
+                }),
+                true,
+                Vec::new()
+            ),
+            Error::<Test>::MissingFiles,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_record_not_root() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let record_id = sha256(&"record-id".as_bytes().to_vec());
+        let record_description = sha256(&"record-description".as_bytes().to_vec());
+        let file_hash = sha256(&"file content".as_bytes().to_vec());
+        assert_err!(
+            LogionLoc::import_tokens_record(
+                RuntimeOrigin::signed(LOC_REQUESTER_ID),
+                LOC_ID,
+                record_id,
+                record_description.clone(),
+                vec![
+                    TokensRecordFile {
+                        name: sha256(&"doc.pdf".as_bytes().to_vec()),
+                        content_type: sha256(&"application/pdf".as_bytes().to_vec()),
+                        hash: file_hash,
+                        size: 789,
+                    },
+                ],
+                LOC_REQUESTER_ID,
+            ),
+            BadOrigin,
+        );
+    });
+}
+
+#[test]
+fn it_imports_valid_record() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let record_id = sha256(&"record-id".as_bytes().to_vec());
+        let record_description = sha256(&"record-description".as_bytes().to_vec());
+        let file_hash = sha256(&"file content".as_bytes().to_vec());
+        let files = vec![
+            TokensRecordFile {
+                name: sha256(&"doc.pdf".as_bytes().to_vec()),
+                content_type: sha256(&"application/pdf".as_bytes().to_vec()),
+                hash: file_hash,
+                size: 789,
+            },
+        ];
+        assert_ok!(LogionLoc::import_tokens_record(
+            RuntimeOrigin::root(),
+            LOC_ID,
+            record_id,
+            record_description.clone(),
+            files.clone(),
+            LOC_REQUESTER_ID,
+        ));
+        assert_eq!(
+            LogionLoc::tokens_records(LOC_ID, record_id),
+            Some(TokensRecord {
+                description: record_description,
+                files: BoundedVec::try_from(files).unwrap(),
+                submitter: LOC_REQUESTER_ID,
+                imported: true,
+            }
+        ));
+    });
+}
+
+#[test]
+fn it_fails_import_record_if_duplicate_key() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let record_id = sha256(&"record-id".as_bytes().to_vec());
+        let record_description = sha256(&"record-description".as_bytes().to_vec());
+        let file_hash = sha256(&"file content".as_bytes().to_vec());
+        assert_ok!(LogionLoc::import_tokens_record(RuntimeOrigin::root(), LOC_ID,
+                record_id,
+                record_description.clone(),
+                vec![
+                    TokensRecordFile {
+                        name: sha256(&"doc.pdf".as_bytes().to_vec()),
+                        content_type: sha256(&"application/pdf".as_bytes().to_vec()),
+                        hash: file_hash,
+                        size: 789,
+                    },
+                ],
+                LOC_REQUESTER_ID,
+        ));
+        assert_err!(LogionLoc::import_tokens_record(
+                RuntimeOrigin::root(),
+                LOC_ID,
+                record_id,
+                record_description.clone(),
+                vec![
+                    TokensRecordFile {
+                        name: sha256(&"doc.pdf".as_bytes().to_vec()),
+                        content_type: sha256(&"application/pdf".as_bytes().to_vec()),
+                        hash: file_hash,
+                        size: 789,
+                    },
+                ],
+                LOC_REQUESTER_ID,
+            ),
+            Error::<Test>::TokensRecordAlreadyExists,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_record_with_duplicate_hash() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let record_id = sha256(&"record-id".as_bytes().to_vec());
+        let record_description = sha256(&"record-description".as_bytes().to_vec());
+        let file_hash = sha256(&"file content".as_bytes().to_vec());
+        let files = vec![
+            TokensRecordFile {
+                name: sha256(&"doc.pdf".as_bytes().to_vec()),
+                content_type: sha256(&"application/pdf".as_bytes().to_vec()),
+                hash: file_hash,
+                size: 789,
+            },
+            TokensRecordFile {
+                name: sha256(&"doc2.pdf".as_bytes().to_vec()),
+                content_type: sha256(&"application/pdf".as_bytes().to_vec()),
+                hash: file_hash,
+                size: 789,
+            },
+        ];
+        assert_err!(LogionLoc::import_tokens_record(RuntimeOrigin::root(), LOC_ID,
+                record_id,
+                record_description.clone(),
+                files,
+                LOC_REQUESTER_ID,
+            ),
+            Error::<Test>::DuplicateFile,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_must_upload() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        let record_id = sha256(&"record-id".as_bytes().to_vec());
+        let record_description = sha256(&"record-description".as_bytes().to_vec());
+        assert_err!(
+            LogionLoc::import_tokens_record(
+                RuntimeOrigin::root(),
+                LOC_ID,
+                record_id,
+                record_description.clone(),
+                vec![],
+                LOC_REQUESTER_ID,
+            ),
+            Error::<Test>::MustUpload,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_invited_contributor_selection_not_root() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        assert_err!(
+            LogionLoc::import_invited_contributor_selection(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, INVITED_CONTRIBUTOR_ID),
+            BadOrigin,
+        );
+    });
+}
+
+#[test]
+fn it_imports_invited_contributor_selection() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        assert_ok!(LogionLoc::import_invited_contributor_selection(RuntimeOrigin::root(), LOC_ID, INVITED_CONTRIBUTOR_ID));
+        assert_eq!(LogionLoc::selected_invited_contributors(LOC_ID, INVITED_CONTRIBUTOR_ID), Some(()));
+    });
+}
+
+#[test]
+fn it_fails_reimport_invited_contributor_selection() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+
+        assert_ok!(LogionLoc::import_invited_contributor_selection(RuntimeOrigin::root(), LOC_ID, INVITED_CONTRIBUTOR_ID));
+        assert_err!(
+            LogionLoc::import_invited_contributor_selection(RuntimeOrigin::root(), LOC_ID, INVITED_CONTRIBUTOR_ID),
+            Error::<Test>::AlreadyExists,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_an_issuer_not_root() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let legal_officer = legal_officer_id(1);
+
+        assert_err!(
+            LogionLoc::import_verified_issuer(
+                RuntimeOrigin::signed(legal_officer),
+                legal_officer,
+                ISSUER_ID1,
+                ISSUER1_IDENTITY_LOC_ID,
+            ),
+            BadOrigin,
+        );
+    });
+}
+
+#[test]
+fn it_imports_an_issuer() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let legal_officer = legal_officer_id(1);
+
+        assert_ok!(LogionLoc::import_verified_issuer(
+            RuntimeOrigin::root(),
+            legal_officer,
+            ISSUER_ID1,
+            ISSUER1_IDENTITY_LOC_ID,
+        ));
+
+        assert_eq!(
+            LogionLoc::verified_issuers(legal_officer, ISSUER_ID1),
+            Some(VerifiedIssuer {
+                identity_loc: ISSUER1_IDENTITY_LOC_ID,
+                imported: true,
+            }),
+        );
+    });
+}
+
+#[test]
+fn it_fails_imports_an_issuer_twice() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let legal_officer = legal_officer_id(1);
+
+        assert_ok!(LogionLoc::import_verified_issuer(
+            RuntimeOrigin::root(),
+            legal_officer,
+            ISSUER_ID1,
+            ISSUER1_IDENTITY_LOC_ID,
+        ));
+
+        assert_err!(
+            LogionLoc::import_verified_issuer(
+                RuntimeOrigin::root(),
+                legal_officer,
+                ISSUER_ID1,
+                ISSUER1_IDENTITY_LOC_ID,
+            ),
+            Error::<Test>::AlreadyExists,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_an_issuer_selection_not_root() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let legal_officer = legal_officer_id(1);
+
+        assert_err!(
+            LogionLoc::import_verified_issuer_selection(
+                RuntimeOrigin::signed(LOC_REQUESTER_ID),
+                LOC_ID,
+                ISSUER_ID1,
+                legal_officer,
+            ),
+            BadOrigin,
+        );
+    });
+}
+
+#[test]
+fn it_imports_an_issuer_selection() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let legal_officer = legal_officer_id(1);
+
+        assert_ok!(LogionLoc::import_verified_issuer_selection(
+            RuntimeOrigin::root(),
+            LOC_ID,
+            ISSUER_ID1,
+            legal_officer,
+        ));
+
+        assert!(LogionLoc::selected_verified_issuers(LOC_ID, ISSUER_ID1).is_some());
+        assert!(LogionLoc::locs_by_verified_issuer((ISSUER_ID1, legal_officer, LOC_ID)).is_some());
+    });
+}
+
+#[test]
+fn it_fails_importing_an_issuer_selection_twice() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let legal_officer = legal_officer_id(1);
+
+        assert_ok!(LogionLoc::import_verified_issuer_selection(
+            RuntimeOrigin::root(),
+            LOC_ID,
+            ISSUER_ID1,
+            legal_officer,
+        ));
+        assert_err!(
+            LogionLoc::import_verified_issuer_selection(
+                RuntimeOrigin::root(),
+                LOC_ID,
+                ISSUER_ID1,
+                legal_officer,
+            ),
+            Error::<Test>::AlreadyExists,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_sponsorship_not_root() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let sponsorship_id = 1;
+        let beneficiary = H160::from_str("0x900edc98db53508e6742723988b872dd08cd09c2").unwrap();
+        let sponsored_account = SupportedAccountId::Other(OtherAccountId::Ethereum(beneficiary));
+        let legal_officer = legal_officer_id(1);
+        let loc_id = Some(LOC_ID);
+
+        assert_err!(
+            LogionLoc::import_sponsorship(
+                RuntimeOrigin::signed(legal_officer),
+                sponsorship_id,
+                SPONSOR_ID,
+                sponsored_account,
+                legal_officer,
+                loc_id,
+            ),
+            BadOrigin,
+        );
+    });
+}
+
+#[test]
+fn it_imports_sponsorship() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let sponsorship_id = 1;
+        let beneficiary = H160::from_str("0x900edc98db53508e6742723988b872dd08cd09c2").unwrap();
+        let sponsored_account = SupportedAccountId::Other(OtherAccountId::Ethereum(beneficiary));
+        let legal_officer = legal_officer_id(1);
+        let loc_id = Some(LOC_ID);
+
+        assert_ok!(LogionLoc::import_sponsorship(
+            RuntimeOrigin::root(),
+            sponsorship_id,
+            SPONSOR_ID,
+            sponsored_account,
+            legal_officer,
+            loc_id,
+        ));
+
+        assert_eq!(
+            LogionLoc::sponsorship(sponsorship_id),
+            Some(Sponsorship {
+                sponsor: SPONSOR_ID,
+                sponsored_account,
+                legal_officer,
+                loc_id,
+                imported: true,
+            }),
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_sponsorship_twice() {
+    new_test_ext().execute_with(|| {
+        setup_default_balances();
+        let sponsorship_id = 1;
+        let beneficiary = H160::from_str("0x900edc98db53508e6742723988b872dd08cd09c2").unwrap();
+        let sponsored_account = SupportedAccountId::Other(OtherAccountId::Ethereum(beneficiary));
+        let legal_officer = legal_officer_id(1);
+        let loc_id = Some(LOC_ID);
+
+        assert_ok!(LogionLoc::import_sponsorship(
+            RuntimeOrigin::root(),
+            sponsorship_id,
+            SPONSOR_ID,
+            sponsored_account,
+            legal_officer,
+            loc_id,
+        ));
+
+        assert_err!(
+            LogionLoc::import_sponsorship(
+                RuntimeOrigin::root(),
+                sponsorship_id,
+                SPONSOR_ID,
+                sponsored_account,
+                legal_officer,
+                loc_id,
+            ),
+            Error::<Test>::AlreadyExists,
         );
     });
 }

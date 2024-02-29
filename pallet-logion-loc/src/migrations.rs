@@ -72,6 +72,7 @@ fn clear_storage<T: Config>(pallet_name: &str, storage_name: &str) -> Weight {
 
 fn add_imported_flag<T: Config>() -> Weight {
     let mut number_translated = 0;
+
     LocMap::<T>::translate_values(|loc: LegalOfficerCaseV22Of<T>| {
         let translated = LegalOfficerCase {
             owner: loc.owner,
@@ -92,6 +93,51 @@ fn add_imported_flag<T: Config>() -> Weight {
             legal_fee: loc.value_fee,
             collection_item_fee: loc.collection_item_fee,
             tokens_record_fee: loc.tokens_record_fee,
+            imported: false,
+        };
+        number_translated += 1;
+        Some(translated)
+    });
+
+    CollectionItemsMap::<T>::translate_values(|loc: CollectionItemV22Of<T>| {
+        let translated = CollectionItem {
+            description: loc.description,
+            files: loc.files,
+            token: loc.token,
+            restricted_delivery: loc.restricted_delivery,
+            terms_and_conditions: loc.terms_and_conditions,
+            imported: false,
+        };
+        number_translated += 1;
+        Some(translated)
+    });
+
+    TokensRecordsMap::<T>::translate_values(|record: TokensRecordV22Of<T>| {
+        let translated = TokensRecord {
+            description: record.description,
+            files: record.files,
+            submitter: record.submitter,
+            imported: false,
+        };
+        number_translated += 1;
+        Some(translated)
+    });
+
+    VerifiedIssuersMap::<T>::translate_values(|issuer: VerifiedIssuerV22Of<T>| {
+        let translated = VerifiedIssuer {
+            identity_loc: issuer.identity_loc,
+            imported: false,
+        };
+        number_translated += 1;
+        Some(translated)
+    });
+
+    SponsorshipMap::<T>::translate_values(|sponsorship: SponsorshipV22Of<T>| {
+        let translated = Sponsorship {
+            sponsor: sponsorship.sponsor,
+            sponsored_account: sponsorship.sponsored_account,
+            legal_officer: sponsorship.legal_officer,
+            loc_id: sponsorship.loc_id,
             imported: false,
         };
         number_translated += 1;
@@ -135,4 +181,65 @@ pub type LegalOfficerCaseV22Of<T> = LegalOfficerCaseV22<
     <T as pallet::Config>::MaxLocMetadata,
     <T as pallet::Config>::MaxLocFiles,
     <T as pallet::Config>::MaxLocLinks,
+>;
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
+pub struct CollectionItemV22<Hash, TokenIssuance, BoundedCollectionItemFilesList, BoundedCollectionItemTCList> {
+    description: Hash,
+    files: BoundedCollectionItemFilesList,
+    token: Option<CollectionItemToken<TokenIssuance, Hash>>,
+    restricted_delivery: bool,
+    terms_and_conditions: BoundedCollectionItemTCList,
+}
+
+pub type CollectionItemV22Of<T> = CollectionItemV22<
+    <T as pallet::Config>::Hash,
+    <T as pallet::Config>::TokenIssuance,
+    BoundedVec<
+        CollectionItemFileOf<T>,
+        <T as pallet::Config>::MaxCollectionItemFiles
+    >,
+    BoundedVec<
+        TermsAndConditionsElementOf<T>,
+        <T as pallet::Config>::MaxCollectionItemTCs
+    >,
+>;
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
+pub struct TokensRecordV22<Hash, BoundedTokensRecordFilesList, AccountId> {
+    description: Hash,
+    files: BoundedTokensRecordFilesList,
+    submitter: AccountId,
+}
+
+pub type TokensRecordV22Of<T> = TokensRecordV22<
+    <T as pallet::Config>::Hash,
+    BoundedVec<
+        TokensRecordFileOf<T>,
+        <T as pallet::Config>::MaxTokensRecordFiles
+    >,
+    <T as frame_system::Config>::AccountId,
+>;
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
+pub struct VerifiedIssuerV22<LocId> {
+    identity_loc: LocId,
+}
+
+pub type VerifiedIssuerV22Of<T> = VerifiedIssuerV22<
+    <T as pallet::Config>::LocId,
+>;
+
+#[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
+pub struct SponsorshipV22<AccountId, EthereumAddress, LocId> {
+    sponsor: AccountId,
+    sponsored_account: SupportedAccountId<AccountId, EthereumAddress>,
+    legal_officer: AccountId,
+    loc_id: Option<LocId>,
+}
+
+pub type SponsorshipV22Of<T> = SponsorshipV22<
+    <T as frame_system::Config>::AccountId,
+    <T as Config>::EthereumAddress,
+    <T as Config>::LocId,
 >;

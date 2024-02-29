@@ -477,6 +477,7 @@ pub struct CollectionItem<Hash, TokenIssuance, BoundedCollectionItemFilesList, B
     token: Option<CollectionItemToken<TokenIssuance, Hash>>,
     restricted_delivery: bool,
     terms_and_conditions: BoundedCollectionItemTCList,
+    imported: bool,
 }
 
 pub type CollectionItemOf<T> = CollectionItem<
@@ -512,6 +513,7 @@ pub struct CollectionItemToken<TokenIssuance, Hash> {
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub struct VerifiedIssuer<LocId> {
     identity_loc: LocId,
+    imported: bool,
 }
 
 pub type VerifiedIssuerOf<T> = VerifiedIssuer<
@@ -523,6 +525,7 @@ pub struct TokensRecord<Hash, BoundedTokensRecordFilesList, AccountId> {
     description: Hash,
     files: BoundedTokensRecordFilesList,
     submitter: AccountId,
+    imported: bool,
 }
 
 pub type TokensRecordOf<T> = TokensRecord<
@@ -556,6 +559,7 @@ pub struct Sponsorship<AccountId, EthereumAddress, LocId> {
     sponsored_account: SupportedAccountId<AccountId, EthereumAddress>,
     legal_officer: AccountId,
     loc_id: Option<LocId>,
+    imported: bool,
 }
 
 pub type SponsorshipOf<T> = Sponsorship<
@@ -790,7 +794,7 @@ pub mod pallet {
 		<T as Config>::LocId,
 		Blake2_128Concat,
 		<T as frame_system::Config>::AccountId, // invited contributor
-		()
+        ()
 	>;
 
 	#[pallet::event]
@@ -822,6 +826,12 @@ pub mod pallet {
         TokensRecordFeeWithdrawn(T::AccountId, BalanceOf<T>, Beneficiary<T::AccountId>, BalanceOf<T>),
         /// Issued upon LOC import. [locId]
         LocImported(T::LocId),
+        /// Issued upon collection item import. [locId, collectionItemId]
+        ItemImported(T::LocId, T::CollectionItemId),
+        /// Issued upon tokens record import. [locId, recordId]
+        TokensRecordImported(T::LocId, T::TokensRecordId),
+        /// Issued upon sponsorship import. [sponsorshipId]
+        SponsorshipImported(T::SponsorshipId)
     }
 
     #[pallet::error]
@@ -953,6 +963,21 @@ pub mod pallet {
         #[cfg(feature = "try-runtime")]
         fn post_upgrade(_state: Vec<u8>) -> Result<(), sp_runtime::DispatchError> {
             assert_eq!(PalletStorageVersion::<T>::get(), StorageVersion::default());
+            for loc in LocMap::<T>::iter_values() {
+                assert!(!loc.imported);
+            }
+            for loc in CollectionItemsMap::<T>::iter_values() {
+                assert!(!loc.imported);
+            }
+            for loc in TokensRecordsMap::<T>::iter_values() {
+                assert!(!loc.imported);
+            }
+            for loc in VerifiedIssuersMap::<T>::iter_values() {
+                assert!(!loc.imported);
+            }
+            for loc in SponsorshipMap::<T>::iter_values() {
+                assert!(!loc.imported);
+            }
             Ok(())
         }
     }
@@ -1374,7 +1399,8 @@ pub mod pallet {
                     Err(Error::<T>::AlreadyNominated)?
                 }
                 <VerifiedIssuersMap<T>>::insert(&who, &issuer, VerifiedIssuer {
-                    identity_loc: identity_loc_id
+                    identity_loc: identity_loc_id,
+                    imported: false,
                 });
                 Ok(().into())
             }
@@ -1499,6 +1525,7 @@ pub mod pallet {
                         description,
                         files: bounded_files,
                         submitter: who.clone(),
+                        imported: false,
                     };
                     <TokensRecordsMap<T>>::insert(collection_loc_id, record_id, record);
                 },
@@ -1557,6 +1584,7 @@ pub mod pallet {
                     sponsored_account: sponsored_account.clone(),
                     legal_officer,
                     loc_id: None,
+                    imported: false,
                 };
                 <SponsorshipMap<T>>::insert(sponsorship_id, sponsorship);
 
@@ -1921,6 +1949,200 @@ pub mod pallet {
                 Ok(().into())
             }
 		}
+
+        /// Imports a collection item
+        #[pallet::call_index(27)]
+        #[pallet::weight(T::WeightInfo::import_collection_item())]
+        pub fn import_collection_item(
+            origin: OriginFor<T>,
+            #[pallet::compact] collection_loc_id: T::LocId,
+            item_id: T::CollectionItemId,
+            item_description: <T as Config>::Hash,
+            item_files: Vec<CollectionItemFileOf<T>>,
+            item_token: Option<CollectionItemToken<T::TokenIssuance, <T as Config>::Hash>>,
+            restricted_delivery: bool,
+            terms_and_conditions: Vec<TermsAndConditionsElement<T::LocId, <T as Config>::Hash>>,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+
+            if item_token.is_some() && item_token.as_ref().unwrap().token_issuance < 1_u32.into() {
+                Err(Error::<T>::BadTokenIssuance)?
+            }
+
+            if restricted_delivery && item_token.is_none() {
+                Err(Error::<T>::MissingToken)?
+            }
+
+            if restricted_delivery && item_files.len() == 0 {
+                Err(Error::<T>::MissingFiles)?
+            }
+
+            let files_hashes: Vec<<T as Config>::Hash> = item_files.iter()
+                .map(|file| file.hash)
+                .collect();
+            if !Self::has_unique_elements(&files_hashes) {
+                Err(Error::<T>::DuplicateFile)?
+            }
+
+            let bounded_files: BoundedVec<CollectionItemFileOf<T>, T::MaxCollectionItemFiles> = BoundedVec::try_from(item_files)
+                .map_err(|_| Error::<T>::CollectionItemFilesTooMuchData)?;
+            let bounded_tcs: BoundedVec<TermsAndConditionsElementOf<T>, T::MaxCollectionItemTCs> = BoundedVec::try_from(terms_and_conditions)
+                .map_err(|_| Error::<T>::CollectionItemTCsTooMuchData)?;
+            if <CollectionItemsMap<T>>::contains_key(&collection_loc_id, &item_id) {
+                Err(Error::<T>::CollectionItemAlreadyExists)?
+            }
+            let item = CollectionItem {
+                description: item_description,
+                files: bounded_files,
+                token: item_token.clone(),
+                restricted_delivery,
+                terms_and_conditions: bounded_tcs,
+                imported: true,
+            };
+            <CollectionItemsMap<T>>::insert(collection_loc_id, item_id, item);
+            let collection_size = <CollectionSizeMap<T>>::get(&collection_loc_id).unwrap_or(0);
+            <CollectionSizeMap<T>>::insert(&collection_loc_id, collection_size + 1);
+
+            Self::deposit_event(Event::ItemImported(collection_loc_id, item_id));
+            Ok(().into())
+        }
+
+        /// Imports a tokens record
+        #[pallet::call_index(28)]
+        #[pallet::weight(T::WeightInfo::import_tokens_record())]
+        pub fn import_tokens_record(
+            origin: OriginFor<T>,
+            #[pallet::compact] collection_loc_id: T::LocId,
+            record_id: T::TokensRecordId,
+            description: <T as Config>::Hash,
+            files: Vec<crate::TokensRecordFileOf<T>>,
+            submitter: T::AccountId,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+
+            if <crate::pallet::TokensRecordsMap<T>>::contains_key(&collection_loc_id, &record_id) {
+                Err(crate::pallet::Error::<T>::TokensRecordAlreadyExists)?
+            }
+            if files.len() == 0 {
+                Err(crate::pallet::Error::<T>::MustUpload)?
+            } else {
+                let files_hashes: Vec<<T as Config>::Hash> = files.iter()
+                    .map(|file| file.hash)
+                    .collect();
+                if !Self::has_unique_elements(&files_hashes) {
+                    Err(crate::pallet::Error::<T>::DuplicateFile)?
+                }
+            }
+
+            let mut bounded_files: BoundedVec<crate::TokensRecordFileOf<T>, T::MaxTokensRecordFiles> = BoundedVec::with_bounded_capacity(files.len());
+            for file in files.iter() {
+                bounded_files.try_push(file.clone()).map_err(|_| crate::pallet::Error::<T>::TokensRecordTooMuchData)?;
+            }
+
+            let record = crate::TokensRecord {
+                description,
+                files: bounded_files,
+                submitter,
+                imported: true,
+            };
+            <TokensRecordsMap<T>>::insert(collection_loc_id, record_id, record);
+
+            Self::deposit_event(Event::TokensRecordImported(collection_loc_id, record_id));
+            Ok(().into())
+        }
+
+        /// Imports an invited contributor selection
+        #[pallet::call_index(29)]
+        #[pallet::weight(T::WeightInfo::import_invited_contributor_selection())]
+        pub fn import_invited_contributor_selection(
+            origin: OriginFor<T>,
+            #[pallet::compact] loc_id: T::LocId,
+            invited_contributor: T::AccountId,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+
+            let already_invited_contributor = Self::selected_invited_contributors(loc_id, &invited_contributor);
+            if already_invited_contributor.is_some() {
+                Err(Error::<T>::AlreadyExists)?
+            } else {
+                <InvitedContributorsByLocMap<T>>::insert(loc_id, &invited_contributor, ());
+            }
+            Ok(().into())
+        }
+
+        /// Import a verified issuer
+        #[pallet::call_index(30)]
+        #[pallet::weight(T::WeightInfo::import_verified_issuer())]
+        pub fn import_verified_issuer(
+            origin: OriginFor<T>,
+            legal_officer: T::AccountId,
+            issuer: T::AccountId,
+            #[pallet::compact] identity_loc_id: T::LocId,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+
+            let existing_issuer = Self::verified_issuers(&legal_officer, &issuer);
+            if existing_issuer.is_some() {
+                Err(Error::<T>::AlreadyExists)?
+            } else {
+                <VerifiedIssuersMap<T>>::insert(&legal_officer, &issuer, VerifiedIssuer {
+                    identity_loc: identity_loc_id,
+                    imported: true,
+                });
+            }
+            Ok(().into())
+        }
+
+        /// Import a verified issuer selection
+        #[pallet::call_index(31)]
+        #[pallet::weight(T::WeightInfo::import_verified_issuer_selection())]
+        pub fn import_verified_issuer_selection(
+            origin: OriginFor<T>,
+            #[pallet::compact] loc_id: T::LocId,
+            issuer: T::AccountId,
+            loc_owner: T::AccountId,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+
+            let already_issuer = Self::selected_verified_issuers(loc_id, &issuer);
+            if already_issuer.is_some() {
+                Err(Error::<T>::AlreadyExists)?
+            } else {
+                <VerifiedIssuersByLocMap<T>>::insert(loc_id, &issuer, ());
+                <LocsByVerifiedIssuerMap<T>>::insert((&issuer, loc_owner, loc_id), ());
+            }
+            Ok(().into())
+        }
+
+        /// Import a sponsorship.
+        #[pallet::call_index(32)]
+        #[pallet::weight(T::WeightInfo::import_sponsorship())]
+        pub fn import_sponsorship(
+            origin: OriginFor<T>,
+            #[pallet::compact] sponsorship_id: T::SponsorshipId,
+            sponsor: T::AccountId,
+            sponsored_account: SupportedAccountId<T::AccountId, T::EthereumAddress>,
+            legal_officer: T::AccountId,
+            loc_id: Option<T::LocId>,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+
+            if <SponsorshipMap<T>>::contains_key(&sponsorship_id) {
+                Err(Error::<T>::AlreadyExists)?
+            } else {
+                let sponsorship = Sponsorship {
+                    sponsor: sponsor.clone(),
+                    sponsored_account: sponsored_account.clone(),
+                    legal_officer,
+                    loc_id,
+                    imported: true,
+                };
+                <SponsorshipMap<T>>::insert(sponsorship_id, sponsorship);
+
+                Self::deposit_event(Event::SponsorshipImported(sponsorship_id));
+                Ok(().into())
+            }
+        }
     }
 
     impl<T: Config> LocQuery<T::LocId, <T as frame_system::Config>::AccountId> for Pallet<T> {
@@ -2240,6 +2462,7 @@ pub mod pallet {
                         token: item_token.clone(),
                         restricted_delivery,
                         terms_and_conditions: bounded_tcs,
+                        imported: false,
                     };
                     <CollectionItemsMap<T>>::insert(collection_loc_id, item_id, item);
                     let collection_size = <CollectionSizeMap<T>>::get(&collection_loc_id).unwrap_or(0);
