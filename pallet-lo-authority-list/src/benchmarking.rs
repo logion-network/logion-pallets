@@ -2,7 +2,7 @@
 #![cfg(feature = "runtime-benchmarks")]
 use super::*;
 
-use crate::{HostData, LegalOfficerData, LegalOfficerDataOf, Pallet as LoAuthorityList};
+use crate::{Pallet as LoAuthorityList};
 
 extern crate alloc;
 use alloc::string::ToString;
@@ -20,24 +20,22 @@ mod benchmarks {
 
     // Benchmark `add_legal_officer` extrinsic with the worst possible conditions:
     // * Add host legal officer (causes re-computation of nodes set).
-    // * There are already "many" legal officers.
-	//
-	// TODO: make this call at worst O(N) in number of LOs
+    // * There are already (MaxNodes - 1) host legal officers.
     #[benchmark]
     fn add_legal_officer() -> Result<(), BenchmarkError> {
-		let initial_lo_count = LoAuthorityList::<T>::legal_officers().len();
-        add_many_legal_officers::<T>();
+		let initial_lo_count = LoAuthorityList::<T>::legal_officers().len() as u32;
+        add_legal_officers::<T>(max_lo_count::<T>() - initial_lo_count - 1);
 
         #[extrinsic_call]
         _(
             RawOrigin::Root,
-            account_num::<T>(MANY_LO_COUNT),
-            host_data_num::<T>(MANY_LO_COUNT),
+            account_num::<T>(max_lo_count::<T>() - 1),
+            host_data_num::<T>(max_lo_count::<T>() - 1),
         );
 
         assert_eq!(
             LoAuthorityList::<T>::legal_officers().len(),
-            initial_lo_count + (MANY_LO_COUNT as usize) + 1
+            max_lo_count::<T>() as usize,
         );
 
         Ok(())
@@ -45,23 +43,21 @@ mod benchmarks {
 
     // Benchmark `remove_legal_officer` extrinsic with the worst possible conditions:
     // * Remove host legal officer (causes re-computation of nodes set).
-    // * There are already "many" legal officers.
-	//
-	// TODO: make this call at worst O(N) in number of LOs
+    // * There are already MaxNodes host legal officers.
     #[benchmark]
     fn remove_legal_officer() -> Result<(), BenchmarkError> {
-		let initial_lo_count = LoAuthorityList::<T>::legal_officers().len();
-        add_many_legal_officers::<T>();
+		let initial_lo_count = LoAuthorityList::<T>::legal_officers().len() as u32;
+        add_legal_officers::<T>(max_lo_count::<T>() - initial_lo_count);
 
         #[extrinsic_call]
         _(
             RawOrigin::Root,
-            account_num::<T>(MANY_LO_COUNT - 1),
+            account_num::<T>(max_lo_count::<T>() - 1),
         );
 
         assert_eq!(
             LoAuthorityList::<T>::legal_officers().len(),
-            initial_lo_count + (MANY_LO_COUNT as usize) - 1
+            (max_lo_count::<T>() - 1) as usize,
         );
 
         Ok(())
@@ -69,28 +65,70 @@ mod benchmarks {
 
 	// Benchmark `update_legal_officer` extrinsic with the worst possible conditions:
     // * Update host legal officer (causes re-computation of nodes set).
-    // * There are already "many" legal officers.
-	//
-	// TODO: make this call at worst O(N) in number of LOs
+    // * There are already MaxNodes host legal officers.
     #[benchmark]
     fn update_legal_officer() -> Result<(), BenchmarkError> {
-		let initial_lo_count = LoAuthorityList::<T>::legal_officers().len();
-        add_many_legal_officers::<T>();
+		let initial_lo_count = LoAuthorityList::<T>::legal_officers().len() as u32;
+        add_legal_officers::<T>(max_lo_count::<T>() - initial_lo_count);
 
         #[extrinsic_call]
         _(
             RawOrigin::Root,
-            account_num::<T>(MANY_LO_COUNT - 1),
-			LegalOfficerData::Host(HostData {
-				node_id: Some(OpaquePeerId(vec![(MANY_LO_COUNT - 1) as u8])),
-				base_url: Some(base_url_num::<T>(MANY_LO_COUNT)), // Change base URL
+            account_num::<T>(max_lo_count::<T>() - 1),
+			LegalOfficerDataParam::Host(HostDataParam {
+				node_id: Some(OpaquePeerId(vec![(max_lo_count::<T>() - 1) as u8])),
+				base_url: Some(base_url_num::<T>(max_lo_count::<T>() - 1)), // Change base URL
 				region: T::Region::from_str("Europe").ok().unwrap(),
 			}),
         );
 
         assert_eq!(
             LoAuthorityList::<T>::legal_officers().len(),
-            initial_lo_count + (MANY_LO_COUNT as usize)
+            max_lo_count::<T>() as usize,
+        );
+
+        Ok(())
+    }
+
+    // Benchmark `import_host_legal_officer` extrinsic with the worst possible conditions:
+    // * There are already (MaxNodes - 1) host legal officers.
+    #[benchmark]
+    fn import_host_legal_officer() -> Result<(), BenchmarkError> {
+        let initial_lo_count = LoAuthorityList::<T>::legal_officers().len() as u32;
+        add_legal_officers::<T>(max_lo_count::<T>() - initial_lo_count - 1);
+
+        #[extrinsic_call]
+        _(
+            RawOrigin::Root,
+            account_num::<T>(max_lo_count::<T>() - 1),
+            host_data_param_num::<T>(max_lo_count::<T>() - 1),
+        );
+
+        assert_eq!(
+            LoAuthorityList::<T>::legal_officers().len(),
+            max_lo_count::<T>() as usize,
+        );
+
+        Ok(())
+    }
+
+    // Benchmark `import_guest_legal_officer` extrinsic with the worst possible conditions:
+    // * There are already (MaxNodes - 1) host legal officers.
+    #[benchmark]
+    fn import_guest_legal_officer() -> Result<(), BenchmarkError> {
+        let initial_lo_count = LoAuthorityList::<T>::legal_officers().len() as u32;
+        add_legal_officers::<T>(max_lo_count::<T>() - initial_lo_count - 1);
+
+        #[extrinsic_call]
+        _(
+            RawOrigin::Root,
+            account_num::<T>(max_lo_count::<T>() - 1),
+            account_num::<T>(0),
+        );
+
+        assert_eq!(
+            LoAuthorityList::<T>::legal_officers().len(),
+            max_lo_count::<T>() as usize,
         );
 
         Ok(())
@@ -103,8 +141,8 @@ mod benchmarks {
     }
 }
 
-fn add_many_legal_officers<T: Config>() {
-	for i in 0..MANY_LO_COUNT {
+fn add_legal_officers<T: Config>(number: u32) {
+	for i in 0..number {
 		assert_ok!(LoAuthorityList::<T>::add_legal_officer(
 			T::RuntimeOrigin::root(),
 			account_num::<T>(i),
@@ -113,7 +151,9 @@ fn add_many_legal_officers<T: Config>() {
 	}
 }
 
-const MANY_LO_COUNT: u32 = 50;
+fn max_lo_count<T: Config>() -> u32 {
+    T::MaxNodes::get()
+}
 
 fn account_num<T: Config>(i: u32) -> T::AccountId {
     account("lo", i, SEED)
@@ -129,10 +169,14 @@ fn base_url_num<T: Config>(i: u32) -> Vec<u8> {
 
 }
 
-fn host_data_num<T: Config>(i: u32) -> LegalOfficerDataOf<T> {
-    LegalOfficerData::Host(HostData {
+fn host_data_num<T: Config>(i: u32) -> LegalOfficerDataParamOf<T> {
+    LegalOfficerDataParam::Host(host_data_param_num::<T>(i))
+}
+
+fn host_data_param_num<T: Config>(i: u32) -> HostDataParamOf<T> {
+    HostDataParam {
         node_id: Some(OpaquePeerId(vec![i as u8])),
         base_url: Some(base_url_num::<T>(i)),
         region: T::Region::from_str("Europe").ok().unwrap(),
-    })
+    }
 }

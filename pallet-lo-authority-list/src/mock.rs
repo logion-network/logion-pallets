@@ -108,5 +108,8 @@ impl pallet_lo_authority_list::Config for Test {
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-    system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
+    let t = system::GenesisConfig::<Test>::default().build_storage().unwrap();
+    let mut ext = sp_io::TestExternalities::new(t);
+    ext.execute_with(|| System::set_block_number(1));
+    ext
 }

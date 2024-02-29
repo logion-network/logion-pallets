@@ -45,7 +45,7 @@ pub struct GenesisHostData {
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 pub enum LegalOfficerData<AccountId, Region, MaxPeerIdLength: Get<u32>, MaxBaseUrlLen: Get<u32>> {
     Host(HostData<Region, MaxPeerIdLength, MaxBaseUrlLen>),
-    Guest(AccountId),
+    Guest(GuestData<AccountId>),
 }
 
 pub type LegalOfficerDataOf<T> = LegalOfficerData<
@@ -69,12 +69,23 @@ pub struct HostData<Region, MaxPeerIdLength: Get<u32>, MaxBaseUrlLen: Get<u32>> 
     pub node_id: Option<BoundedPeerId<MaxPeerIdLength>>,
 	pub base_url: Option<BoundedVec<u8, MaxBaseUrlLen>>,
     pub region: Region,
+    pub imported: bool,
 }
 
 pub type HostDataOf<T> = HostData<
 	<T as Config>::Region,
 	<T as Config>::MaxPeerIdLength,
 	<T as Config>::MaxBaseUrlLen,
+>;
+
+#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
+pub struct GuestData<AccountId> {
+    pub host_id: AccountId,
+    pub imported: bool,
+}
+
+pub type GuestDataOf<T> = GuestData<
+    <T as frame_system::Config>::AccountId,
 >;
 
 #[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo)]
@@ -164,11 +175,12 @@ pub mod pallet {
         V2AddOnchainSettings,
         V3GuestLegalOfficers,
         V4Region,
+        V5Imported,
     }
 
     impl Default for StorageVersion {
         fn default() -> StorageVersion {
-            return StorageVersion::V4Region;
+            return StorageVersion::V5Imported;
         }
     }
 
@@ -193,7 +205,24 @@ pub mod pallet {
     where <T::Region as FromStr>::Err: Debug
     {
         fn build(&self) {
+            PalletStorageVersion::<T>::put(StorageVersion::default());
             Pallet::<T>::initialize_legal_officers(&self.legal_officers);
+        }
+    }
+
+    #[pallet::hooks]
+    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+
+        #[cfg(feature = "try-runtime")]
+        fn post_upgrade(_state: Vec<u8>) -> Result<(), sp_runtime::DispatchError> {
+            assert_eq!(PalletStorageVersion::<T>::get(), StorageVersion::default());
+            for legal_officer in LegalOfficerSet::<T>::iter_values() {
+                match legal_officer {
+                    LegalOfficerData::Host(host_data) => assert!(!host_data.imported),
+                    LegalOfficerData::Guest(guest_data) => assert!(!guest_data.imported),
+                }
+            }
+            Ok(())
         }
     }
 
@@ -206,6 +235,8 @@ pub mod pallet {
         LoRemoved(T::AccountId),
         /// Issued when an LO is updated. [accountId]
         LoUpdated(T::AccountId),
+        /// Issued when an LO is imported. [accountId]
+        LoImported(T::AccountId),
     }
 
     #[pallet::error]
@@ -236,9 +267,6 @@ pub mod pallet {
 		PeerIdTooLong,
 	}
 
-    #[pallet::hooks]
-    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
-
     #[pallet::call]
     impl<T:Config> Pallet<T> {
 
@@ -251,10 +279,11 @@ pub mod pallet {
             data: LegalOfficerDataParamOf<T>,
         ) -> DispatchResultWithPostInfo {
             T::AddOrigin::ensure_origin(origin)?;
-			let bounded_data = Self::map_to_bounded_legal_officer_data(&data)?;
+			let bounded_data = Self::map_to_bounded_legal_officer_data(&data, false)?;
             Self::do_add_legal_officer(
                 legal_officer_id,
-				bounded_data
+				bounded_data,
+                false,
             )
         }
 
@@ -296,9 +325,10 @@ pub mod pallet {
             if to_update.is_none() {
                 Err(Error::<T>::NotFound)?
             } else {
-				let bounded_data = Self::map_to_bounded_legal_officer_data(&data)?;
-                Self::ensure_host_if_guest(&bounded_data)?;
                 let some_to_update = to_update.unwrap();
+                let imported = Self::was_imported(&some_to_update);
+                let bounded_data = Self::map_to_bounded_legal_officer_data(&data, imported)?;
+                Self::ensure_host_if_guest(&bounded_data)?;
                 match some_to_update {
                     LegalOfficerData::Host(_) => match bounded_data {
                         LegalOfficerData::Guest(_) => {
@@ -337,6 +367,44 @@ pub mod pallet {
                 Ok(().into())
             }
         }
+
+        /// Import a host LO
+        #[pallet::call_index(3)]
+        #[pallet::weight(T::WeightInfo::import_host_legal_officer())]
+        pub fn import_host_legal_officer(
+            origin: OriginFor<T>,
+            legal_officer_id: T::AccountId,
+            data: HostDataParamOf<T>,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+            let bounded_data = Self::map_to_bounded_host_legal_officer_data(&data, true)?;
+            Self::do_add_legal_officer(
+                legal_officer_id,
+                bounded_data,
+                true,
+            )
+        }
+
+        /// Import a guest LO
+        #[pallet::call_index(4)]
+        #[pallet::weight(T::WeightInfo::import_guest_legal_officer())]
+        pub fn import_guest_legal_officer(
+            origin: OriginFor<T>,
+            legal_officer_id: T::AccountId,
+            host_id: T::AccountId,
+        ) -> DispatchResultWithPostInfo {
+            ensure_root(origin)?;
+            let imported = true;
+            let bounded_data = LegalOfficerData::Guest(GuestData {
+                host_id,
+                imported,
+            });
+            Self::do_add_legal_officer(
+                legal_officer_id,
+                bounded_data,
+                imported,
+            )
+        }
     }
 }
 
@@ -367,6 +435,7 @@ impl<T: Config> Pallet<T> {
 					node_id,
 					base_url,
 					region,
+                    imported: false,
 				}
 			);
 			LegalOfficerSet::<T>::insert::<&T::AccountId, &LegalOfficerDataOf<T>>(&(legal_officer.0), llo_data);
@@ -412,7 +481,7 @@ impl<T: Config> Pallet<T> {
         for data in LegalOfficerSet::<T>::iter_values() {
             match data {
                 LegalOfficerData::Guest(host) =>
-                    if host == *host_id { return true },
+                    if host.host_id == *host_id { return true },
                 _ => (),
             }
         }
@@ -421,7 +490,7 @@ impl<T: Config> Pallet<T> {
 
     fn ensure_host_if_guest(data: &LegalOfficerDataOf<T>) -> Result<(), Error<T>> {
         match &data {
-            LegalOfficerData::Guest(host) => Self::ensure_host(host),
+            LegalOfficerData::Guest(data) => Self::ensure_host(&data.host_id),
             _ => Ok(()),
         }
     }
@@ -441,6 +510,7 @@ impl<T: Config> Pallet<T> {
     fn do_add_legal_officer(
         legal_officer_id: T::AccountId,
         data: LegalOfficerDataOf<T>,
+        imported: bool,
     ) -> DispatchResultWithPostInfo {
         if <LegalOfficerSet<T>>::contains_key(&legal_officer_id) {
             Err(Error::<T>::AlreadyExists)?
@@ -449,49 +519,66 @@ impl<T: Config> Pallet<T> {
             <LegalOfficerSet<T>>::insert(legal_officer_id.clone(), &data);
             Self::try_reset_legal_officer_nodes(&data)?;
 
-            Self::deposit_event(Event::LoAdded(legal_officer_id));
+            if imported {
+                Self::deposit_event(Event::LoImported(legal_officer_id));
+            } else {
+                Self::deposit_event(Event::LoAdded(legal_officer_id));
+            }
             Ok(().into())
         }
     }
 
     fn get_region(data: &LegalOfficerDataOf<T>) -> T::Region {
         match data {
-            LegalOfficerData::Guest(host_account_id) => Self::get_region(&LegalOfficerSet::<T>::get(host_account_id).unwrap()),
+            LegalOfficerData::Guest(guest_data) => Self::get_region(&LegalOfficerSet::<T>::get(&guest_data.host_id).unwrap()),
             LegalOfficerData::Host(host_data) => host_data.region,
         }
     }
 
-	fn map_to_bounded_legal_officer_data(data: &LegalOfficerDataParamOf<T>) -> Result<LegalOfficerDataOf<T>, Error<T>> {
+	fn map_to_bounded_legal_officer_data(data: &LegalOfficerDataParamOf<T>, imported: bool) -> Result<LegalOfficerDataOf<T>, Error<T>> {
 		let bounded_data = match data {
-			LegalOfficerDataParam::Host(host_data) => {
-				let base_url = match host_data.base_url.clone() {
-					Some(url) => {
-						let bounded_url = BoundedVec::try_from(url)
-							.map_err(|_| Error::<T>::BaseUrlTooLong)?;
-						Some(bounded_url)
-					},
-					None => None,
-				};
-				let node_id = match host_data.node_id.clone() {
-					Some(peer_id) => {
-						let bounded_node_id = BoundedVec::try_from(peer_id.0)
-							.map_err(|_| Error::<T>::PeerIdTooLong)?;
-						Some(BoundedPeerId::new(bounded_node_id))
-					}
-					None => None,
-				};
-				LegalOfficerData::Host(
-					HostData {
-						node_id,
-						base_url,
-						region: host_data.region,
-					}
-				)
-			},
-			LegalOfficerDataParam::Guest(account_id) => LegalOfficerData::Guest(account_id.clone()),
+			LegalOfficerDataParam::Host(host_data) => Self::map_to_bounded_host_legal_officer_data(host_data, imported)?,
+			LegalOfficerDataParam::Guest(account_id) => LegalOfficerData::Guest(GuestData {
+                host_id: account_id.clone(),
+                imported,
+            }),
 		};
 		Ok(bounded_data)
 	}
+
+    fn map_to_bounded_host_legal_officer_data(host_data: &HostDataParamOf<T>, imported: bool) -> Result<LegalOfficerDataOf<T>, Error<T>> {
+        let base_url = match host_data.base_url.clone() {
+            Some(url) => {
+                let bounded_url = BoundedVec::try_from(url)
+                    .map_err(|_| Error::<T>::BaseUrlTooLong)?;
+                Some(bounded_url)
+            },
+            None => None,
+        };
+        let node_id = match host_data.node_id.clone() {
+            Some(peer_id) => {
+                let bounded_node_id = BoundedVec::try_from(peer_id.0)
+                    .map_err(|_| Error::<T>::PeerIdTooLong)?;
+                Some(BoundedPeerId::new(bounded_node_id))
+            }
+            None => None,
+        };
+        Ok(LegalOfficerData::Host(
+            HostData {
+                node_id,
+                base_url,
+                region: host_data.region,
+                imported,
+            }
+        ))
+    }
+
+    fn was_imported(data: &LegalOfficerDataOf<T>) -> bool {
+        match data {
+            LegalOfficerData::Host(host_data) => host_data.imported,
+            LegalOfficerData::Guest(guest_data) => guest_data.imported,
+        }
+    }
 }
 
 impl<T: Config> EnsureOrigin<T::RuntimeOrigin> for Pallet<T> {
@@ -528,6 +615,10 @@ impl<T: Config> LegalOfficerCreation<T::AccountId> for Pallet<T> {
         guest_legal_officer_id: T::AccountId,
         host_legal_officer_id: T::AccountId) -> DispatchResultWithPostInfo {
 
-        Pallet::<T>::do_add_legal_officer(guest_legal_officer_id, LegalOfficerData::Guest(host_legal_officer_id))
+        let imported = false;
+        Pallet::<T>::do_add_legal_officer(guest_legal_officer_id, LegalOfficerData::Guest(GuestData {
+            host_id: host_legal_officer_id,
+            imported,
+        }), imported)
     }
 }
