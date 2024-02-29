@@ -52,7 +52,7 @@ mod benchmarks {
         #[extrinsic_call]
         _(
             RawOrigin::Root,
-            account_num::<T>(max_lo_count::<T>() - 1),
+            account_num::<T>(0),
         );
 
         assert_eq!(
@@ -74,10 +74,10 @@ mod benchmarks {
         #[extrinsic_call]
         _(
             RawOrigin::Root,
-            account_num::<T>(max_lo_count::<T>() - 1),
+            account_num::<T>(0),
 			LegalOfficerDataParam::Host(HostDataParam {
-				node_id: Some(OpaquePeerId(vec![(max_lo_count::<T>() - 1) as u8])),
-				base_url: Some(base_url_num::<T>(max_lo_count::<T>() - 1)), // Change base URL
+				node_id: Some(OpaquePeerId(vec![0u8])),
+				base_url: Some(base_url_num::<T>(0)), // Change base URL
 				region: T::Region::from_str("Europe").ok().unwrap(),
 			}),
         );
