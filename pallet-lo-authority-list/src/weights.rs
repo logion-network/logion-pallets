@@ -10,6 +10,8 @@ pub trait WeightInfo {
     fn add_legal_officer() -> Weight;
     fn remove_legal_officer() -> Weight;
     fn update_legal_officer() -> Weight;
+	fn import_host_legal_officer() -> Weight;
+	fn import_guest_legal_officer() -> Weight;
 }
 
 /// Weights for pallet_logion_loc using the Substrate node and recommended hardware.
@@ -53,6 +55,18 @@ impl<T: frame_system::Config> WeightInfo for SubstrateWeight<T> {
 		//  Measured:  `4910`
 		//  Estimated: `137075`
 		// Minimum execution time: 244_677_000 picoseconds.
+		Weight::from_parts(253_044_000, 0)
+			.saturating_add(Weight::from_parts(0, 137075))
+			.saturating_add(T::DbWeight::get().reads(53))
+			.saturating_add(T::DbWeight::get().writes(2))
+	}
+	fn import_host_legal_officer() -> Weight {
+		Weight::from_parts(253_044_000, 0)
+			.saturating_add(Weight::from_parts(0, 137075))
+			.saturating_add(T::DbWeight::get().reads(53))
+			.saturating_add(T::DbWeight::get().writes(2))
+	}
+	fn import_guest_legal_officer() -> Weight {
 		Weight::from_parts(253_044_000, 0)
 			.saturating_add(Weight::from_parts(0, 137075))
 			.saturating_add(T::DbWeight::get().reads(53))

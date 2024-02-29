@@ -1,4 +1,4 @@
-use crate::{mock::*, LegalOfficerData, Error, LegalOfficerDataOf, HostDataOf, LegalOfficerDataParam, HostDataParam, LegalOfficerDataParamOf, BoundedPeerId};
+use crate::{mock::*, LegalOfficerData, Error, LegalOfficerDataOf, HostDataOf, LegalOfficerDataParam, HostDataParam, LegalOfficerDataParamOf, BoundedPeerId, HostData, HostDataParamOf, GuestData};
 use frame_support::{assert_err, assert_ok};
 use logion_shared::IsLegalOfficer;
 use sp_core::OpaquePeerId;
@@ -502,4 +502,117 @@ fn it_fails_to_update_when_node_id_too_long() {
 		});
 		assert_err!(LoAuthorityList::update_legal_officer(RuntimeOrigin::root(), LEGAL_OFFICER_ID, host_data), Error::<Test>::PeerIdTooLong);
 	});
+}
+
+#[test]
+fn it_fails_import_host_not_root() {
+    new_test_ext().execute_with(|| {
+        let HostParamAndBytes { node_id_bytes: _, base_url_bytes: _, host_data } = build_host_param();
+        assert_err!(
+            LoAuthorityList::import_host_legal_officer(RuntimeOrigin::signed(LEGAL_OFFICER_ID), LEGAL_OFFICER_ID, host_data.clone()),
+            BadOrigin,
+        );
+    });
+}
+
+fn build_host_param() -> HostParamAndBytes {
+    let node_id_bytes = bs58::decode("12D3KooWBmAwcd4PJNJvfV89HwE48nwkRmAgo8Vy3uQEyNNHBox2").into_vec().unwrap();
+    let base_url_bytes = "https://node1.logion.network".as_bytes().to_vec();
+    let host_data = HostDataParam {
+        node_id: Some(OpaquePeerId(node_id_bytes.clone())),
+        base_url: Some(base_url_bytes.clone()),
+        region: Region::Europe,
+    };
+    HostParamAndBytes {
+        node_id_bytes,
+        base_url_bytes,
+        host_data,
+    }
+}
+
+struct HostParamAndBytes {
+    node_id_bytes: Vec<u8>,
+    base_url_bytes: Vec<u8>,
+    host_data: HostDataParamOf<Test>,
+}
+
+#[test]
+fn it_imports_host() {
+    new_test_ext().execute_with(|| {
+        let HostParamAndBytes { node_id_bytes, base_url_bytes, host_data } = build_host_param();
+        assert_ok!(LoAuthorityList::import_host_legal_officer(RuntimeOrigin::root(), LEGAL_OFFICER_ID, host_data.clone()));
+        assert_eq!(
+            LoAuthorityList::legal_officer_set(LEGAL_OFFICER_ID).unwrap(),
+            LegalOfficerData::Host(HostData {
+                node_id: Some(BoundedPeerId(BoundedVec::try_from(node_id_bytes).unwrap())),
+                base_url: Some(BoundedVec::try_from(base_url_bytes).unwrap()),
+                region: host_data.region,
+                imported: true,
+            }));
+        assert_eq!(LoAuthorityList::legal_officer_nodes().len(), 1);
+        System::assert_has_event(RuntimeEvent::LoAuthorityList(crate::Event::LoImported {
+            0: LEGAL_OFFICER_ID,
+        }));
+    });
+}
+
+#[test]
+fn it_fails_import_host_twice() {
+    new_test_ext().execute_with(|| {
+        let HostParamAndBytes { node_id_bytes: _, base_url_bytes: _, host_data } = build_host_param();
+        assert_ok!(LoAuthorityList::import_host_legal_officer(RuntimeOrigin::root(), LEGAL_OFFICER_ID, host_data.clone()));
+        assert_err!(
+            LoAuthorityList::import_host_legal_officer(RuntimeOrigin::root(), LEGAL_OFFICER_ID, host_data),
+            Error::<Test>::AlreadyExists,
+        );
+    });
+}
+
+#[test]
+fn it_fails_import_guest_not_root() {
+    new_test_ext().execute_with(|| {
+        let HostParamAndBytes { node_id_bytes: _, base_url_bytes: _, host_data } = build_host_param();
+        assert_ok!(LoAuthorityList::import_host_legal_officer(RuntimeOrigin::root(), LEGAL_OFFICER_ID, host_data));
+
+        assert_err!(
+            LoAuthorityList::import_guest_legal_officer(RuntimeOrigin::signed(LEGAL_OFFICER_ID), LEGAL_OFFICER_ID2, LEGAL_OFFICER_ID),
+            BadOrigin,
+        );
+    });
+}
+
+#[test]
+fn it_imports_guest() {
+    new_test_ext().execute_with(|| {
+        let HostParamAndBytes { node_id_bytes: _, base_url_bytes: _, host_data } = build_host_param();
+        assert_ok!(LoAuthorityList::import_host_legal_officer(RuntimeOrigin::root(), LEGAL_OFFICER_ID, host_data));
+
+        assert_ok!(LoAuthorityList::import_guest_legal_officer(RuntimeOrigin::root(), LEGAL_OFFICER_ID2, LEGAL_OFFICER_ID));
+
+        assert_eq!(
+            LoAuthorityList::legal_officer_set(LEGAL_OFFICER_ID2).unwrap(),
+            LegalOfficerData::Guest(GuestData {
+                host_id: LEGAL_OFFICER_ID,
+                imported: true,
+            }));
+        assert_eq!(LoAuthorityList::legal_officer_nodes().len(), 1);
+        System::assert_has_event(RuntimeEvent::LoAuthorityList(crate::Event::LoImported {
+            0: LEGAL_OFFICER_ID2,
+        }));
+    });
+}
+
+#[test]
+fn it_fails_import_guest_twice() {
+    new_test_ext().execute_with(|| {
+        let HostParamAndBytes { node_id_bytes: _, base_url_bytes: _, host_data } = build_host_param();
+        assert_ok!(LoAuthorityList::import_host_legal_officer(RuntimeOrigin::root(), LEGAL_OFFICER_ID, host_data));
+
+        assert_ok!(LoAuthorityList::import_guest_legal_officer(RuntimeOrigin::root(), LEGAL_OFFICER_ID2, LEGAL_OFFICER_ID));
+
+        assert_err!(
+            LoAuthorityList::import_guest_legal_officer(RuntimeOrigin::root(), LEGAL_OFFICER_ID2, LEGAL_OFFICER_ID),
+            Error::<Test>::AlreadyExists,
+        );
+    });
 }
