@@ -3799,33 +3799,6 @@ fn it_fails_import_item_with_duplicate_hash() {
 }
 
 #[test]
-fn it_fails_import_bad_issuance() {
-    new_test_ext().execute_with(|| {
-        setup_default_balances();
-
-        let collection_item_id = BlakeTwo256::hash_of(&"item-id".as_bytes().to_vec());
-        let collection_item_description = sha256(&"item-description".as_bytes().to_vec());
-        assert_err!(
-            LogionLoc::import_collection_item(
-                RuntimeOrigin::root(),
-                LOC_ID,
-                collection_item_id,
-                collection_item_description.clone(),
-                vec![],
-                Some(CollectionItemToken {
-                    token_issuance: 0,
-                    token_id: sha256(&"some_id".as_bytes().to_vec()),
-                    token_type: sha256(&"some_type".as_bytes().to_vec()),
-                }),
-                false,
-                Vec::new()
-            ),
-            Error::<Test>::BadTokenIssuance,
-        );
-    });
-}
-
-#[test]
 fn it_fails_import_missing_token() {
     new_test_ext().execute_with(|| {
         setup_default_balances();

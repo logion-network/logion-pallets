@@ -426,7 +426,6 @@ where
 
     pub fn ensure_can_import<T: pallet::Config>(&self, items: &Items<LocId, AccountId, EthereumAddress, Hash>) -> Result<(), sp_runtime::DispatchError> {
         self.ensure_can_add_metadata::<T>(&items.metadata.iter().map(|item| item.name).collect())?;
-        self.ensure_can_add_files::<T>(&items.files.iter().map(|item| item.hash).collect())?;
         self.ensure_can_add_links::<T>(&items.links.iter().map(|item| item.id).collect())?;
         Ok(())
     }
@@ -1964,10 +1963,6 @@ pub mod pallet {
             terms_and_conditions: Vec<TermsAndConditionsElement<T::LocId, <T as Config>::Hash>>,
         ) -> DispatchResultWithPostInfo {
             ensure_root(origin)?;
-
-            if item_token.is_some() && item_token.as_ref().unwrap().token_issuance < 1_u32.into() {
-                Err(Error::<T>::BadTokenIssuance)?
-            }
 
             if restricted_delivery && item_token.is_none() {
                 Err(Error::<T>::MissingToken)?
