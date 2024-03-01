@@ -426,7 +426,6 @@ where
 
     pub fn ensure_can_import<T: pallet::Config>(&self, items: &Items<LocId, AccountId, EthereumAddress, Hash>) -> Result<(), sp_runtime::DispatchError> {
         self.ensure_can_add_metadata::<T>(&items.metadata.iter().map(|item| item.name).collect())?;
-        self.ensure_can_add_links::<T>(&items.links.iter().map(|item| item.id).collect())?;
         Ok(())
     }
 
