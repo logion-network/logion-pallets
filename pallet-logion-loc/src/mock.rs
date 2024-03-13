@@ -2,13 +2,13 @@ use crate::{self as pallet_loc, NegativeImbalanceOf, RequesterOf, Hasher};
 use logion_shared::{DistributionKey, IsLegalOfficer};
 use sp_core::hash::H256;
 use frame_benchmarking::account;
-use frame_support::{construct_runtime, parameter_types, traits::{EnsureOrigin, Currency}};
+use frame_support::{derive_impl, construct_runtime, parameter_types, traits::{EnsureOrigin, Currency}};
 use sp_io::hashing::sha2_256;
-use sp_runtime::{traits::{BlakeTwo256, IdentityLookup}, testing::Header, Percent, generic, BuildStorage};
+use sp_runtime::{traits::{BlakeTwo256, IdentityLookup}, Percent, BuildStorage};
 use frame_system as system;
 use sp_core::H160;
 
-type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+type Block = frame_system::mocking::MockBlock<Test>;
 
 pub type AccountId = u64;
 pub type Balance = u128;
@@ -31,14 +31,14 @@ parameter_types! {
     pub const SS58Prefix: u8 = 42;
 }
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl system::Config for Test {
-    type Block = generic::Block<Header, UncheckedExtrinsic>;
+    type Block = Block;
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
     type BlockLength = ();
     type DbWeight = ();
     type RuntimeOrigin = RuntimeOrigin;
-    type Nonce = u64;
     type RuntimeCall = RuntimeCall;
     type Hash = Hash;
     type Hashing = BlakeTwo256;
@@ -76,7 +76,6 @@ impl pallet_balances::Config for Test {
     type AccountStore = System;
     type FreezeIdentifier = ();
     type MaxFreezes = MaxFreezes;
-    type MaxHolds = MaxHolds;
     type RuntimeHoldReason = ();
     type RuntimeFreezeReason = ();
     type WeightInfo = ();

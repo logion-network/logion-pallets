@@ -1,7 +1,7 @@
 use crate::{self as pallet_block_reward, NegativeImbalanceOf};
 
 use frame_support::{
-    construct_runtime, parameter_types, traits::Currency,
+    derive_impl, construct_runtime, parameter_types, traits::Currency,
 };
 #[cfg(feature = "runtime-benchmarks")]
 use frame_support::dispatch::RawOrigin;
@@ -10,8 +10,6 @@ use frame_system as system;
 
 use sp_core::H256;
 use sp_runtime::{
-    generic,
-    testing::Header,
     traits::{BlakeTwo256, IdentityLookup},
     Percent,
     BuildStorage,
@@ -21,7 +19,7 @@ use logion_shared::{DistributionKey, IsLegalOfficer, RewardDistributor};
 pub type AccountId = u64;
 pub type Balance = u128;
 
-type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+type Block = frame_system::mocking::MockBlock<Test>;
 
 construct_runtime!(
     pub struct Test {
@@ -35,13 +33,14 @@ parameter_types! {
     pub const BlockHashCount: u64 = 250;
 }
 
-impl frame_system::Config for Test {
-    type Block = generic::Block<Header, UncheckedExtrinsic>;
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
+impl system::Config for Test {
+    type Block = Block;
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
     type BlockLength = ();
+    type DbWeight = ();
     type RuntimeOrigin = RuntimeOrigin;
-    type Nonce = u64;
     type RuntimeCall = RuntimeCall;
     type Hash = H256;
     type Hashing = BlakeTwo256;
@@ -49,7 +48,6 @@ impl frame_system::Config for Test {
     type Lookup = IdentityLookup<Self::AccountId>;
     type RuntimeEvent = RuntimeEvent;
     type BlockHashCount = BlockHashCount;
-    type DbWeight = ();
     type Version = ();
     type PalletInfo = PalletInfo;
     type AccountData = pallet_balances::AccountData<Balance>;
@@ -80,7 +78,6 @@ impl pallet_balances::Config for Test {
     type AccountStore = System;
     type FreezeIdentifier = ();
     type MaxFreezes = MaxFreezes;
-    type MaxHolds = MaxHolds;
     type RuntimeHoldReason = ();
     type RuntimeFreezeReason = ();
     type WeightInfo = ();

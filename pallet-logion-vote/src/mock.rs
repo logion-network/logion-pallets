@@ -1,17 +1,16 @@
 use frame_support::dispatch::DispatchResultWithPostInfo;
 use crate as pallet_logion_vote;
 use frame_benchmarking::account;
-use frame_support::parameter_types;
+use frame_support::{derive_impl, parameter_types};
 use frame_support::traits::EnsureOrigin;
 use sp_core::hash::H256;
 use sp_runtime::{
-    traits::{BlakeTwo256, IdentityLookup}, generic, testing::Header, BuildStorage,
+    traits::{BlakeTwo256, IdentityLookup}, BuildStorage,
 };
 use frame_system::{self as system, Config};
 use logion_shared::{IsLegalOfficer, LegalOfficerCaseSummary, LegalOfficerCreation, LocQuery, LocValidity};
 
-type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
-
+type Block = frame_system::mocking::MockBlock<Test>;
 pub type AccountId = u64;
 pub type LocId = u32;
 
@@ -103,14 +102,14 @@ parameter_types! {
     pub const SS58Prefix: u8 = 42;
 }
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl system::Config for Test {
-    type Block = generic::Block<Header, UncheckedExtrinsic>;
+    type Block = Block;
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
     type BlockLength = ();
     type DbWeight = ();
     type RuntimeOrigin = RuntimeOrigin;
-    type Nonce = u64;
     type RuntimeCall = RuntimeCall;
     type Hash = H256;
     type Hashing = BlakeTwo256;

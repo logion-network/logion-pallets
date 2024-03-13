@@ -2,15 +2,15 @@ use crate::{self as pallet_verified_recovery};
 use logion_shared::{LocQuery, CreateRecoveryCallFactory, LegalOfficerCaseSummary};
 use sp_core::hash::H256;
 use frame_benchmarking::account;
-use frame_support::parameter_types;
+use frame_support::{derive_impl, parameter_types};
 use sp_runtime::{
-    traits::{BlakeTwo256, IdentityLookup}, testing::Header, generic, BuildStorage,
+    traits::{BlakeTwo256, IdentityLookup}, BuildStorage,
 };
 use frame_system as system;
 use system::pallet_prelude::BlockNumberFor;
 
-type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type AccountId = u64;
+type Block = frame_system::mocking::MockBlock<Test>;
 
 frame_support::construct_runtime!(
     pub enum Test {
@@ -24,14 +24,14 @@ parameter_types! {
     pub const SS58Prefix: u8 = 42;
 }
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl system::Config for Test {
-    type Block = generic::Block<Header, UncheckedExtrinsic>;
+    type Block = Block;
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
     type BlockLength = ();
     type DbWeight = ();
     type RuntimeOrigin = RuntimeOrigin;
-    type Nonce = u64;
     type RuntimeCall = RuntimeCall;
     type Hash = H256;
     type Hashing = BlakeTwo256;
