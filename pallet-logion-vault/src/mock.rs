@@ -2,18 +2,18 @@ use crate::{self as pallet_logion_vault};
 use logion_shared::{IsLegalOfficer, MultisigApproveAsMultiCallFactory, MultisigAsMultiCallFactory};
 use pallet_multisig::Timepoint;
 use sp_core::hash::H256;
-use frame_support::{parameter_types, traits::EnsureOrigin};
+use frame_support::{derive_impl, parameter_types, traits::EnsureOrigin};
 #[cfg(feature = "runtime-benchmarks")]
 use frame_support::dispatch::RawOrigin;
 use sp_runtime::{
-    traits::{BlakeTwo256, IdentityLookup}, testing::Header, generic, BuildStorage,
+    traits::{BlakeTwo256, IdentityLookup}, BuildStorage,
 };
 use frame_system as system;
 use sp_std::convert::{TryInto, TryFrom};
 use system::{ensure_signed, pallet_prelude::BlockNumberFor};
 use sp_weights::Weight;
 
-type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
+type Block = frame_system::mocking::MockBlock<Test>;
 
 frame_support::construct_runtime!(
     pub enum Test {
@@ -27,14 +27,14 @@ parameter_types! {
     pub const SS58Prefix: u8 = 42;
 }
 
+#[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl system::Config for Test {
-    type Block = generic::Block<Header, UncheckedExtrinsic>;
+    type Block = Block;
     type BaseCallFilter = frame_support::traits::Everything;
     type BlockWeights = ();
     type BlockLength = ();
     type DbWeight = ();
     type RuntimeOrigin = RuntimeOrigin;
-    type Nonce = u64;
     type RuntimeCall = RuntimeCall;
     type Hash = H256;
     type Hashing = BlakeTwo256;
