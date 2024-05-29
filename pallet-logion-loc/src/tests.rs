@@ -2012,6 +2012,10 @@ fn it_adds_tokens_record_issuer() {
 }
 
 fn it_adds_tokens_record(submitter: AccountId) {
+    it_adds_tokens_record_charging(submitter, LOC_REQUESTER_ID, false);
+}
+
+fn it_adds_tokens_record_charging(submitter: AccountId, payer: AccountId, charge_submitter: bool) {
     new_test_ext().execute_with(|| {
         setup_default_balances();
         create_closed_collection_with_selected_issuer();
@@ -2023,8 +2027,8 @@ fn it_adds_tokens_record(submitter: AccountId) {
         let record_description = build_record_description();
         let record_files = build_record_files(1);
 
-        let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, legal_officers());
-        assert_ok!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(submitter), LOC_ID, record_id, record_description.clone(), record_files.clone()));
+        let snapshot = BalancesSnapshot::take(payer, legal_officers());
+        assert_ok!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(submitter), LOC_ID, record_id, record_description.clone(), record_files.clone(), charge_submitter));
 
         let record = LogionLoc::tokens_records(LOC_ID, record_id).unwrap();
         assert_eq!(record.description, record_description);
@@ -2087,8 +2091,8 @@ fn it_fails_adding_tokens_record_already_exists() {
         let record_files = build_record_files(1);
 
         let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, legal_officers());
-        assert_ok!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description.clone(), record_files.clone()));
-        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files.clone()), Error::<Test>::TokensRecordAlreadyExists);
+        assert_ok!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description.clone(), record_files.clone(), false));
+        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files.clone(), false), Error::<Test>::TokensRecordAlreadyExists);
         let file = record_files.get(0).unwrap();
 
         let fees = Fees::only_storage_and_tokens_record(1, file.size, TOKENS_RECORD_FEE, Beneficiary::LegalOfficer(legal_officer_id(1)));
@@ -2105,7 +2109,7 @@ fn it_fails_adding_tokens_record_not_contributor() {
         let record_description = build_record_description();
         let record_files = build_record_files(1);
 
-        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID2), LOC_ID, record_id, record_description, record_files), Error::<Test>::CannotAddRecord);
+        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID2), LOC_ID, record_id, record_description, record_files, false), Error::<Test>::CannotAddRecord);
     });
 }
 
@@ -2118,7 +2122,7 @@ fn it_fails_adding_tokens_record_collection_open() {
         let record_description = build_record_description();
         let record_files = build_record_files(1);
 
-        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files), Error::<Test>::CannotAddRecord);
+        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files, false), Error::<Test>::CannotAddRecord);
     });
 }
 
@@ -2132,7 +2136,7 @@ fn it_fails_adding_tokens_record_collection_void() {
         let record_description = build_record_description();
         let record_files = build_record_files(1);
 
-        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files), Error::<Test>::CannotAddRecord);
+        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files, false), Error::<Test>::CannotAddRecord);
     });
 }
 
@@ -2145,7 +2149,7 @@ fn it_fails_adding_tokens_record_not_collection() {
         let record_description = build_record_description();
         let record_files = build_record_files(1);
 
-        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files), Error::<Test>::CannotAddRecord);
+        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files, false), Error::<Test>::CannotAddRecord);
     });
 }
 
@@ -2158,7 +2162,7 @@ fn it_fails_adding_tokens_record_no_files() {
         let record_description = build_record_description();
         let record_files = vec![];
 
-        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files), Error::<Test>::MustUpload);
+        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files, false), Error::<Test>::MustUpload);
     });
 }
 
@@ -2183,7 +2187,7 @@ fn it_fails_adding_tokens_record_duplicate_file() {
         };
         let record_files = vec![file1, file2];
 
-        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files), Error::<Test>::DuplicateFile);
+        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files, false), Error::<Test>::DuplicateFile);
     });
 }
 
@@ -2196,7 +2200,7 @@ fn it_fails_adding_tokens_record_too_many_files() {
         let record_description = build_record_description();
         let record_files = build_record_files(256);
 
-        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files), Error::<Test>::TokensRecordTooMuchData);
+        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files, false), Error::<Test>::TokensRecordTooMuchData);
     });
 }
 
@@ -2211,7 +2215,7 @@ fn it_fails_adding_tokens_record_when_insufficient_funds() {
         let record_files = build_record_files(1);
 
         let snapshot = BalancesSnapshot::take(LOC_REQUESTER_ID, legal_officers());
-        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files), Error::<Test>::InsufficientFunds);
+        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(ISSUER_ID1), LOC_ID, record_id, record_description, record_files, false), Error::<Test>::InsufficientFunds);
         check_no_fees(snapshot);
     });
 }
@@ -3304,7 +3308,7 @@ fn it_fails_to_add_tokens_record_when_insufficient_funds() {
         let storage_fees = Fees::storage_fees(1, record_files[0].size);
         set_balance(LOC_REQUESTER_ID, 2 * storage_fees); // Requester can pay storage but not tokens record
 
-        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, record_id, record_description.clone(), record_files.clone()), Error::<Test>::InsufficientFunds);
+        assert_err!(LogionLoc::add_tokens_record(RuntimeOrigin::signed(LOC_REQUESTER_ID), LOC_ID, record_id, record_description.clone(), record_files.clone(), false), Error::<Test>::InsufficientFunds);
     });
 }
 
@@ -3684,7 +3688,7 @@ fn it_imports_open_identity_loc_other_account() {
         let ethereum_account = H160::from_str("0x900edc98db53508e6742723988b872dd08cd09c2").unwrap();
         let requester = OtherAccountId::Ethereum(ethereum_account);
         test_import_loc(
-            Requester::OtherAccount(requester),
+            OtherAccount(requester),
             LocType::Identity,
             false,
             false,
@@ -4256,4 +4260,9 @@ fn it_fails_import_sponsorship_twice() {
             Error::<Test>::AlreadyExists,
         );
     });
+}
+
+#[test]
+fn it_adds_tokens_record_issuer_charged() {
+    it_adds_tokens_record_charging(INVITED_CONTRIBUTOR_ID, INVITED_CONTRIBUTOR_ID, true);
 }
