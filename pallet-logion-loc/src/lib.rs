@@ -1473,6 +1473,7 @@ pub mod pallet {
             record_id: T::TokensRecordId,
             description: <T as Config>::Hash,
             files: Vec<TokensRecordFileOf<T>>,
+            charge_submitter: bool,
         ) -> DispatchResultWithPostInfo {
             let who = ensure_signed(origin)?;
 
@@ -1483,7 +1484,7 @@ pub mod pallet {
                     if <TokensRecordsMap<T>>::contains_key(&collection_loc_id, &record_id) {
                         Err(Error::<T>::TokensRecordAlreadyExists)?
                     }
-                    if ! Self::can_add_record(&who, &collection_loc_id, &collection_loc) {
+                    if !Self::can_add_record(&who, &collection_loc_id, &collection_loc) {
                         Err(Error::<T>::CannotAddRecord)?
                     }
                     if files.len() == 0 {
@@ -1501,9 +1502,11 @@ pub mod pallet {
                     for file in files.iter() {
                         bounded_files.try_push(file.clone()).map_err(|_| Error::<T>::TokensRecordTooMuchData)?;
                     }
-                    let fee_payer = match collection_loc.requester {
-                        Account(requester_account) => requester_account,
-                        _ => panic!("Requester cannot pay the fees")
+                    let fee_payer = if charge_submitter { who.clone() } else {
+                        match collection_loc.requester {
+                            Account(requester_account) => requester_account,
+                            _ => panic!("Requester cannot pay the fees")
+                        }
                     };
 
                     let tot_size = files.iter()
