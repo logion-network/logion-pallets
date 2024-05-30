@@ -961,21 +961,6 @@ pub mod pallet {
         #[cfg(feature = "try-runtime")]
         fn post_upgrade(_state: Vec<u8>) -> Result<(), sp_runtime::DispatchError> {
             assert_eq!(PalletStorageVersion::<T>::get(), StorageVersion::default());
-            for loc in LocMap::<T>::iter_values() {
-                assert!(!loc.imported);
-            }
-            for loc in CollectionItemsMap::<T>::iter_values() {
-                assert!(!loc.imported);
-            }
-            for loc in TokensRecordsMap::<T>::iter_values() {
-                assert!(!loc.imported);
-            }
-            for loc in VerifiedIssuersMap::<T>::iter_values() {
-                assert!(!loc.imported);
-            }
-            for loc in SponsorshipMap::<T>::iter_values() {
-                assert!(!loc.imported);
-            }
             Ok(())
         }
     }

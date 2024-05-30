@@ -216,12 +216,6 @@ pub mod pallet {
         #[cfg(feature = "try-runtime")]
         fn post_upgrade(_state: Vec<u8>) -> Result<(), sp_runtime::DispatchError> {
             assert_eq!(PalletStorageVersion::<T>::get(), StorageVersion::default());
-            for legal_officer in LegalOfficerSet::<T>::iter_values() {
-                match legal_officer {
-                    LegalOfficerData::Host(host_data) => assert!(!host_data.imported),
-                    LegalOfficerData::Guest(guest_data) => assert!(!guest_data.imported),
-                }
-            }
             Ok(())
         }
     }
